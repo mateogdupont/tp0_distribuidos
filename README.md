@@ -69,7 +69,8 @@ En esta primera parte del trabajo práctico se plantean una serie de ejercicios 
 Modificar la definición del DockerCompose para agregar un nuevo cliente al proyecto.
 
 ### Ejercicio N°1.1:
-Definir un script (en el lenguaje deseado) que permita crear una definición de DockerCompose con una cantidad configurable de clientes.
+Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" el cual crea una cantidad N de clientes. El mismo debe ser ejecutado de la siguinete manera:
+`py .\create_new_docker_compose N` con N la cantidad de clientes deseada.
 
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
