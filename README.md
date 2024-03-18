@@ -68,12 +68,16 @@ En esta primera parte del trabajo práctico se plantean una serie de ejercicios 
 ### Ejercicio N°1:
 Modificar la definición del DockerCompose para agregar un nuevo cliente al proyecto.
 
-### Ejercicio N°1.1:
+### Resolucion ejercicio N°1.1:
 Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" el cual crea una cantidad N de clientes. El mismo debe ser ejecutado de la siguinete manera:
 `py .\create_new_docker_compose N` con N la cantidad de clientes deseada.
 
-### Ejercicio N°2:
-Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
+### Resolucion Ejercicio N°2:
+Se agrega al archivo docker-compose-dev los volumenes para el server y de los clientes, con el fin de vincular los archivos de la maquina host con los archivos del container. Siendo estos archivos `config.ini` para el server y `config.yaml` para el cliente. En la declaracion del volumen unicamente se comparten dichos archivos, es decir, no se comparte toda la carpeta. Asi mismo, se aclara que se opto por volumenes sin nombre o tambien llamados anonimos.
+
+Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de añadir los volumenes.
+
+Se verifica el correcto funcionamiento al realizar 'make docker-compose-up' con 'docker-image' comentado y corroborando los cambios realizados en la configuracion del servidor y de los clientes sin necesidad de realizar un nuevo build de las imagenes.
 
 ### Ejercicio N°3:
 Crear un script que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un EchoServer, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado. Netcat no debe ser instalado en la máquina _host_ y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`).

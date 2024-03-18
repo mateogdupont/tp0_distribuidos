@@ -10,7 +10,9 @@ SERVER_LINES = ["\tserver:",
                     "\t\t\t- PYTHONUNBUFFERED=1",
                     "\t\t\t- LOGGING_LEVEL=DEBUG",
                     "\t\tnetworks:",
-                    "\t\t\t- testing_net"]
+                    "\t\t\t- testing_net",
+                    "\t\tvolumes:",
+                    "\t\t\t- ./server/config.ini:/config.ini:ro"]
 NETWORK_LINES = ["\nnetworks:",
                     "\ttesting_net:",
                     "\t\tipam:",
@@ -38,7 +40,9 @@ def write_n_clients(file,amount):
                         "\t\tnetworks:",
                         "\t\t\t- testing_net",
                         "\t\tdepends_on:",
-                        "\t\t\t- server"]
+                        "\t\t\t- server",
+                        "\t\tvolumes:",
+                        "\t\t\t- ./client/config.yaml:/config.yaml:ro"]
         if write_lines(file,client_lines) != 0:
             return -1
         
