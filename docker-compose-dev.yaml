@@ -43,6 +43,7 @@ services:
 
   tester:
     container_name: tester
+    profiles: ["ssl"]
     image: ubuntu:latest
     command: tail -f /dev/null
     networks:
