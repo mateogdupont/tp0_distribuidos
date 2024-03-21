@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -39,7 +42,7 @@ func (c *Client) createClientSocket() error {
 	conn, err := net.Dial("tcp", c.config.ServerAddress)
 	if err != nil {
 		log.Fatalf(
-	        "action: connect | result: fail | client_id: %v | error: %v",
+			"action: connect | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)
@@ -48,10 +51,22 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
+func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
+	<-sigs
+	c.conn.Close()
+	log.Infof("action: Handling SIGTERM | result: success | client_id: %v",c.config.ID,)
+	finish_channel <- true
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// autoincremental msgID to identify every message sent
 	msgID := 1
+
+	sigs := make (chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM);
+	finish_channel := make(chan bool, 1)
+	go sigterm_handler(sigs,finish_channel, c)
 
 loop:
 	// Send messages if the loopLapse threshold has not been surpassed
@@ -62,6 +77,12 @@ loop:
                 c.config.ID,
             )
 			break loop
+		case <- finish_channel:
+			log.Infof("action: Exiting loop | result: success | client_id: %v",c.config.ID,)
+			close(finish_channel)
+			close(sigs)
+			break loop
+
 		default:
 		}
 
