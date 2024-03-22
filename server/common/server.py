@@ -32,6 +32,40 @@ class Server:
             client_sock = self.__accept_new_connection()
             self.__handle_client_connection(client_sock)
 
+
+    def receive_message(self, client_sock):
+
+        complete_msg = ""
+
+        while True:
+            partial_msg = client_sock.recv(1024).rstrip().decode('utf-8')
+            if not partial_msg:
+                break
+
+            complete_msg += partial_msg
+            if ',' in complete_msg:
+                split_msg = complete_msg.split(',', 1)
+                expected_byte_size = int(split_msg[0])
+                received_payload_size = len(split_msg[1])
+                if received_payload_size >= expected_byte_size:
+                    break
+        
+        return complete_msg
+    
+    def send_ack_message(self, client_sock, msg):
+        size_inside_msg = msg.split(',', 1)[0]
+        payload_size = len("ACK:" + size_inside_msg)
+        ack_message = "{},".format(payload_size) + "ACK:" + size_inside_msg
+        remaind_size = len(ack_message)
+
+        while remaind_size > 0:
+            sent_data_size = client_sock.send("{}\n".format(ack_message).encode('utf-8'))
+            if sent_data_size == 0:
+                break
+            remaind_size -= sent_data_size
+            ack_message = ack_message[sent_data_size:]
+            
+    
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -40,12 +74,10 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
+            msg = self.receive_message(client_sock)
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            self.send_ack_message(client_sock,msg)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:

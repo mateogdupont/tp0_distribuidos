@@ -8,6 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"strings"
+	"strconv"
+	"io"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -58,6 +61,56 @@ func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	finish_channel <- true
 }
 
+func (c *Client)sendMessage (payload_msg string) error{
+	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg) - 2,payload_msg)
+
+	remainSize := len(msgWithHeader)
+	for remainSize > 0 {
+		sendDataSize, err := c.conn.Write([]byte(msgWithHeader))
+		if err != nil {
+			return err
+		}
+		if sendDataSize == 0 {
+			break
+		}
+		remainSize -= sendDataSize
+	}
+	return nil
+}
+
+func (c *Client)receiveMessage () (string, error){
+	reader := bufio.NewReader(c.conn)
+	completeMsg := ""
+
+	for {
+		partialMsg, err := reader.ReadString('\n')
+		if (err != nil) && (err != io.EOF){
+			return "", err
+		}
+		partialMsg = strings.TrimRight(partialMsg, "\r\n")
+
+		if partialMsg == "" {
+			break
+		}
+
+		completeMsg += partialMsg
+		if strings.Contains(completeMsg, ",") {
+			splitMsg := strings.SplitN(completeMsg, ",", 2)
+			expectedByteSize, err := strconv.Atoi(splitMsg[0])
+			if err != nil {
+				return "", err
+			}
+			receivedPayloadSize := len(splitMsg[1])
+			if receivedPayloadSize >= expectedByteSize {
+				break
+			}
+		}
+	}
+	return completeMsg, nil
+}
+
+
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// autoincremental msgID to identify every message sent
@@ -86,17 +139,11 @@ loop:
 		default:
 		}
 
-		// Create the connection the server in every loop iteration. Send an
+		// Create the connection the server in every loop iteration.
 		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+		msg_to_send := fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
+		c.sendMessage(msg_to_send)
+		msg, err := c.receiveMessage()
 		msgID++
 		c.conn.Close()
 

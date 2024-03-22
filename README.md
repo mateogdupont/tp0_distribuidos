@@ -92,15 +92,18 @@ Continuando con `$(echo "Test01" | nc server 12345)`, aqui capturamos el resulta
 
 Por ultimo, se detienen y eliminan los containers utilizados para la prueba.
 
-### Ejercicio N°4:
-Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
+### Resolucion ejercicio N°4:
+Se agregan los handlers respectivos para el servidor y para el cliente para lograr obtener un graceful finish en caso de recibir una señal SIGTERM.
+
+En caso del servidor, se utiliza la libreria signal. Dicha libreria nos permite definir un handler que sera llamado al momento de recibir la señal SIGTERM, este handler cambia el estado de una variable interna de server. En el bucle principal del servidor se verifica el estado de dicha variable para salir del bucle en caso que corresponda. Tras esto, se cierran los recursos abiertos por el programa y se finaliza la ejecucion. 
+
+En el caso del cliente, se utilizan las librerias `os` y `syscall`. Previo al loop del cliente, se llama asincronicamente al handler de la señal, dicha señal proviene de un channel por lo que el handler al recibir dicho valor por el channel envia el valor true por un channel llamado "finish channel". Este segundo channel es escuchado por el loop principal mediante un select, lo que permite que al momento en el que se reciba el valor true por dicho canal se salga del loop cerrando correctamente los recursos del cliente.
 
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base al código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
 
-### Ejercicio N°5:
-Modificar la lógica de negocio tanto de los clientes como del servidor para nuestro nuevo caso de uso.
+### Resolucion ejercicio N°5:
 
 #### Cliente
 Emulará a una _agencia de quiniela_ que participa del proyecto. Existen 5 agencias. Deberán recibir como variables de entorno los campos que representan la apuesta de una persona: nombre, apellido, DNI, nacimiento, numero apostado (en adelante 'número'). Ej.: `NOMBRE=Santiago Lionel`, `APELLIDO=Lorca`, `DOCUMENTO=30904465`, `NACIMIENTO=1999-03-17` y `NUMERO=7574` respectivamente.
@@ -111,12 +114,15 @@ Los campos deben enviarse al servidor para dejar registro de la apuesta. Al reci
 Emulará a la _central de Lotería Nacional_. Deberá recibir los campos de la cada apuesta desde los clientes y almacenar la información mediante la función `store_bet(...)` para control futuro de ganadores. La función `store_bet(...)` es provista por la cátedra y no podrá ser modificada por el alumno.
 Al persistir se debe imprimir por log: `action: apuesta_almacenada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
 
-#### Comunicación:
-Se deberá implementar un módulo de comunicación entre el cliente y el servidor donde se maneje el envío y la recepción de los paquetes, el cual se espera que contemple:
-* Definición de un protocolo para el envío de los mensajes.
-* Serialización de los datos.
-* Correcta separación de responsabilidades entre modelo de dominio y capa de comunicación.
-* Correcto empleo de sockets, incluyendo manejo de errores y evitando los fenómenos conocidos como [_short read y short write_](https://cs61.seas.harvard.edu/site/2018/FileDescriptors/).
+#### Protocolo de Comunicación:
+En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, se plantea una estructura de mensaje que se compone de un header y un payload. 
+
+En primer lugar al header, unicamente tendremos el tamaño del payload.
+
+Por otro lado, el payload contendra todos los campos necesarios para realizar la apuesta con sus campos serparados por una coma. 
+
+
+Ejemplo de mensaje: payload_size,agency_id,name,last_name,client_id,birthdate,number
 
 ### Ejercicio N°6:
 Modificar los clientes para que envíen varias apuestas a la vez (modalidad conocida como procesamiento por _chunks_ o _batchs_). La información de cada agencia será simulada por la ingesta de su archivo numerado correspondiente, provisto por la cátedra dentro de `.data/datasets.zip`.
