@@ -106,23 +106,31 @@ Las secciones de repaso del trabajo práctico plantean un caso de uso denominado
 ### Resolucion ejercicio N°5:
 
 #### Cliente
-Emulará a una _agencia de quiniela_ que participa del proyecto. Existen 5 agencias. Deberán recibir como variables de entorno los campos que representan la apuesta de una persona: nombre, apellido, DNI, nacimiento, numero apostado (en adelante 'número'). Ej.: `NOMBRE=Santiago Lionel`, `APELLIDO=Lorca`, `DOCUMENTO=30904465`, `NACIMIENTO=1999-03-17` y `NUMERO=7574` respectivamente.
+El cliente recibe como variables de entorno todos los datos necesarios para realizar una apuesta. Dicha informacion se guarda dentro de la configuracion que se encuentra dentro del propio cliente.
 
-Los campos deben enviarse al servidor para dejar registro de la apuesta. Al recibir la confirmación del servidor se debe imprimir por log: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+Se agrega un el archivo `bet.go` donde se declara el tipo `BetRegister` junto a sus correspondientes funciones. Al momento de realizar una apuesta, el cliente utiliza la funcion `sendBetMessage` donde se crea una apuesta a partir de los datos cargados en la configuracion y luego se emplea dicha apuesta para crear un mensaje segun el protocolo descipto mas adelante y se envia hacia el servidor con la funcion `sendMessage`. Esta ultima funcion es la encargada de enviar los datos hacia el servidor evitando el fenomeno de short-write.
+
+Tras enviar la apuesta al servidor, el cliente utiliza la funcion `receiveMessage` para recibir el ACK por parte del servidor. En este caso, la funcion esta preparada para evitar el fenomeno de short-read.
 
 #### Servidor
-Emulará a la _central de Lotería Nacional_. Deberá recibir los campos de la cada apuesta desde los clientes y almacenar la información mediante la función `store_bet(...)` para control futuro de ganadores. La función `store_bet(...)` es provista por la cátedra y no podrá ser modificada por el alumno.
-Al persistir se debe imprimir por log: `action: apuesta_almacenada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+Se agrega la funcion `_receive_message` la cual devuelve el mensaje leido desde el socket evitando el fenomeno de short-read. Tras ello, se utiliza la funcion `procces_message` para crear una apuesta desde el mensaje obtenido y luego almacenarla.
+
+Por ultimo, se envia al cliente un ACK mediante la funcion `_send_ack_message` la cual evita el problema de short.write.
 
 #### Protocolo de Comunicación:
-En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, se plantea una estructura de mensaje que se compone de un header y un payload. 
+En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, consiste en una estructura de mensaje que se compone de un header y un payload. 
 
-En primer lugar al header, unicamente tendremos el tamaño del payload.
+En primer lugar al header, unicamente tendremos el tamaño del payload. Este header se encuentra al inicio del mensaje y al igual que el resto de componentes se encuentra separador del mensaje por una coma. El header del mensaje se considera el tamaño minimo a leer del mensaje y en caso de que la lectura del mensaje no contenga al menos al header completo se debera enviar nuevamente.
 
-Por otro lado, el payload contendra todos los campos necesarios para realizar la apuesta con sus campos serparados por una coma. 
+Por otro lado, el payload contendra todos los campos correspondientes para el contenido del mensaje. En caso de ser un mensaje de apuesta, se compondra de los campos necesarios para realizar la apuesta con sus campos separados por una coma. Por otro lado, en caso de ser un mensaje de ACK se tendra la cadena "ACK" y el tamaño del paquete recibido anteriormente.
 
 
-Ejemplo de mensaje: payload_size,agency_id,name,last_name,client_id,birthdate,number
+Ejemplo de mensaje de apuesta: payload_size,agency_id,name,lastname,document,birthdate,number
+
+Ejemplo de mensaje ACK: payload_size,ACK:size_of_received_message
+
+
+Simplemente a modo de aclaracion, se menciona que como convencion se opto por que en caso de que se detecte un error al enviar o recibir un mensjae, no se reenviara el mensaje. Por ejemplo, en caso de que al momento de enviar la apuesta, la funcion `Write` del socket falle, no se reenviara la apuesta.
 
 ### Ejercicio N°6:
 Modificar los clientes para que envíen varias apuestas a la vez (modalidad conocida como procesamiento por _chunks_ o _batchs_). La información de cada agencia será simulada por la ingesta de su archivo numerado correspondiente, provisto por la cátedra dentro de `.data/datasets.zip`.

@@ -21,6 +21,7 @@ type ClientConfig struct {
 	ServerAddress string
 	LoopLapse     time.Duration
 	LoopPeriod    time.Duration
+	BetRegister   *BetRegister
 }
 
 // Client Entity that encapsulates how
@@ -61,13 +62,17 @@ func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	finish_channel <- true
 }
 
-func (c *Client)sendMessage (payload_msg string) error{
-	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg) - 2,payload_msg)
+func (c *Client)sendMessage (msg string) error{
+	remainSize := len(msg)
 
-	remainSize := len(msgWithHeader)
 	for remainSize > 0 {
-		sendDataSize, err := c.conn.Write([]byte(msgWithHeader))
+		sendDataSize, err := c.conn.Write([]byte(msg))
 		if err != nil {
+			c.conn.Close()
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+                c.config.ID,
+				err,
+			)
 			return err
 		}
 		if sendDataSize == 0 {
@@ -85,6 +90,8 @@ func (c *Client)receiveMessage () (string, error){
 	for {
 		partialMsg, err := reader.ReadString('\n')
 		if (err != nil) && (err != io.EOF){
+			c.conn.Close()
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
 			return "", err
 		}
 		partialMsg = strings.TrimRight(partialMsg, "\r\n")
@@ -98,6 +105,8 @@ func (c *Client)receiveMessage () (string, error){
 			splitMsg := strings.SplitN(completeMsg, ",", 2)
 			expectedByteSize, err := strconv.Atoi(splitMsg[0])
 			if err != nil {
+				c.conn.Close()
+				log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
 				return "", err
 			}
 			receivedPayloadSize := len(splitMsg[1])
@@ -110,6 +119,12 @@ func (c *Client)receiveMessage () (string, error){
 }
 
 
+func (c *Client)sendBetMessage () error{
+	betRegister := c.config.BetRegister
+	payload_msg := betRegister.toBetMessage()
+	msgWithHeader := fmt.Sprintf("%d,%s,%s", len(payload_msg) - 2,c.config.ID,payload_msg)
+	return c.sendMessage(msgWithHeader);
+}
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
@@ -141,23 +156,18 @@ loop:
 
 		// Create the connection the server in every loop iteration.
 		c.createClientSocket()
-		msg_to_send := fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
-		c.sendMessage(msg_to_send)
-		msg, err := c.receiveMessage()
-		msgID++
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-                c.config.ID,
-				err,
-			)
+		send_error := c.sendBetMessage()
+		if send_error !=nil{
 			return
 		}
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-            c.config.ID,
-            msg,
-        )
+		_, err := c.receiveMessage()
+		if err != nil {
+			return
+		}
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+		
+		msgID++
+		c.conn.Close()
 
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)

@@ -2,6 +2,8 @@ import socket
 import logging
 import signal
 
+from common.utils import *
+
 class Server:
     def __init__(self, port, listen_backlog):
         # Initialize server socket
@@ -33,7 +35,7 @@ class Server:
             self.__handle_client_connection(client_sock)
 
 
-    def receive_message(self, client_sock):
+    def _receive_message(self, client_sock):
 
         complete_msg = ""
 
@@ -50,22 +52,29 @@ class Server:
                 if received_payload_size >= expected_byte_size:
                     break
         
+        addr = client_sock.getpeername()
+        logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {complete_msg}')
         return complete_msg
     
-    def send_ack_message(self, client_sock, msg):
+    def _send_ack_message(self, client_sock, msg):
         size_inside_msg = msg.split(',', 1)[0]
         payload_size = len("ACK:" + size_inside_msg)
-        ack_message = "{},".format(payload_size) + "ACK:" + size_inside_msg
+        ack_message = "{}\n,".format(payload_size) + "ACK:" + size_inside_msg
         remaind_size = len(ack_message)
 
         while remaind_size > 0:
-            sent_data_size = client_sock.send("{}\n".format(ack_message).encode('utf-8'))
+            sent_data_size = client_sock.send(ack_message)
             if sent_data_size == 0:
                 break
             remaind_size -= sent_data_size
             ack_message = ack_message[sent_data_size:]
-            
-    
+
+    #TODO: Handle errors     
+    def _procces_message(self, msg):
+        bet = Bet.from_message(msg)
+        store_bets([bet])
+        logging.info(f'action: apuesta_almacenada | result: success | dni: ${bet.document} | numero: ${bet.number}')
+         
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -74,10 +83,11 @@ class Server:
         client socket will also be closed
         """
         try:
-            msg = self.receive_message(client_sock)
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            self.send_ack_message(client_sock,msg)
+            msg = self._receive_message(client_sock)
+
+            self.procces_message(msg)
+            self._send_ack_message(client_sock,msg)
+
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
