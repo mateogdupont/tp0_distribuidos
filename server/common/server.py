@@ -14,7 +14,6 @@ class Server:
         signal.signal(signal.SIGTERM, self.sigterm_handler)
 
     def sigterm_handler(self, signal,frame):
-        #TODO hacer el log
         logging.info(f'action: receive_kill_signal | result: success | SIGTERM')
         self._exit = True
 
@@ -42,6 +41,7 @@ class Server:
         while True:
             partial_msg = client_sock.recv(1024).rstrip().decode('utf-8')
             if not partial_msg:
+                logging.error("action: receive_message | result: fail | error: {e}")
                 break
 
             complete_msg += partial_msg
@@ -65,11 +65,11 @@ class Server:
         while remaind_size > 0:
             sent_data_size = client_sock.send(ack_message)
             if sent_data_size == 0:
+                logging.error("action: send_message | result: fail | error: {e}")
                 break
             remaind_size -= sent_data_size
             ack_message = ack_message[sent_data_size:]
-
-    #TODO: Handle errors     
+  
     def _procces_message(self, msg):
         bet = Bet.from_message(msg)
         store_bets([bet])
@@ -84,7 +84,8 @@ class Server:
         """
         try:
             msg = self._receive_message(client_sock)
-
+            if not msg.strip():
+                return
             self.procces_message(msg)
             self._send_ack_message(client_sock,msg)
 
