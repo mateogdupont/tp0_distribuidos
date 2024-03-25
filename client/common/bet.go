@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
+	"encoding/csv"
 )
 
 type BetRegister struct {
@@ -25,29 +26,68 @@ func NewBetRegister(name string, lastname string, document int, birthdate string
 	}
 }
 
+func FromCSV(readLine []string) (*BetRegister, error) {
+    document, docErr := strconv.Atoi(readLine[2])
+    if docErr != nil {
+        return nil, docErr
+    }
+
+    number, err := strconv.Atoi(readLine[4])
+    if err != nil {
+        return nil, err
+    }
+
+    return &BetRegister{
+        Name:      readLine[0],
+        Lastname: readLine[1],
+        Document: document,
+        Birthdate: readLine[3],
+        Number:    number,
+    }, nil
+}
+
+
+
 func FromMessage (message string) (*BetRegister, error){
-	split_msg := strings.Split(message, ",")
-	if len(split_msg) != 6 {
+	splitMsg := strings.Split(message, ",")
+	if len(splitMsg) != 6 {
 		return nil, fmt.Errorf("invalid format")
 	}
-	document, err := strconv.Atoi(split_msg[4])
-	if err != nil {
-		return nil, fmt.Errorf("invalid document format: %v", err)
+	document, docErr := strconv.Atoi(splitMsg[4])
+	if docErr != nil {
+		return nil, docErr
 	}
-	number, err := strconv.Atoi(split_msg[6])
+	number, err := strconv.Atoi(splitMsg[6])
 	if err != nil {
-		return nil, fmt.Errorf("invalid number format: %v", err)
+		return nil, err
 	}
 
 	return &BetRegister{
-		Name:      split_msg[2],
-		Lastname: split_msg[3],
+		Name:      splitMsg[2],
+		Lastname: splitMsg[3],
 		Document: document,
-		Birthdate: split_msg[5],
+		Birthdate: splitMsg[5],
 		Number:    number,
 	}, nil
 }
 
 func (b *BetRegister)toBetMessage () string{
 	return fmt.Sprintf("%s,%s,%d,%s,%d", b.Name, b.Lastname, b.Document, b.Birthdate, b.Number)
+}
+
+func readChunkFromFile(reader *csv.Reader, chunksize int) ([]*BetRegister, error){
+	var bets []*BetRegister
+    for i := 0; i < chunksize; i++ {
+        readLine, read_err := reader.Read()
+        if read_err != nil{
+            return bets, read_err
+        }
+		readBet, err := FromCSV(readLine)
+		if err != nil{
+			return nil, err
+		}
+		bets = append(bets, readBet) 
+    }
+
+    return bets, nil
 }

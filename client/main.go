@@ -35,6 +35,8 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
+	v.BindEnv("bets", "amount")
+	v.BindEnv("bets", "filePath")
 	v.BindEnv("name")
 	v.BindEnv("lastname")
 	v.BindEnv("document")
@@ -83,7 +85,7 @@ func InitLogger(logLevel string) error {
 // PrintConfig Print all the configuration parameters of the program.
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
-	logrus.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_lapse: %v | loop_period: %v | log_level: %s | name: %s | lastname: %s | document: %d | birthname: %s | number: %d",
+	logrus.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_lapse: %v | loop_period: %v | log_level: %s | name: %s | lastname: %s | document: %d | birthname: %s | number: %d | bet_amount: %s | bet_filePath: %s",
 	    v.GetString("id"),
 	    v.GetString("server.address"),
 	    v.GetDuration("loop.lapse"),
@@ -94,6 +96,8 @@ func PrintConfig(v *viper.Viper) {
 		v.GetInt("document"),
 		v.GetString("birthdate"),
 		v.GetInt("number"),
+		v.GetString("bets.amount"),
+		v.GetString("bets.filePath"),
     )
 }
 
@@ -122,6 +126,8 @@ func main() {
 		LoopLapse:     v.GetDuration("loop.lapse"),
 		LoopPeriod:    v.GetDuration("loop.period"),
 		BetRegister:   betRegister,
+		BetAmount: 	   v.GetString("bets.amount"),
+		BetFilePath:   v.GetString("bets.filePath"),
 	}
 
 	client := common.NewClient(clientConfig)

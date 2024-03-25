@@ -11,6 +11,7 @@ import (
 	"strings"
 	"strconv"
 	"io"
+	"encoding/csv"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -22,6 +23,8 @@ type ClientConfig struct {
 	LoopLapse     time.Duration
 	LoopPeriod    time.Duration
 	BetRegister   *BetRegister
+	BetAmount	  string
+	BetFilePath   string
 }
 
 // Client Entity that encapsulates how
@@ -115,14 +118,45 @@ func (c *Client)receiveMessage () (string, error){
 			}
 		}
 	}
+	log.Infof("action: receive_messsage | result: success | msg: %v",completeMsg,)
 	return completeMsg, nil
 }
 
 
 func (c *Client)sendBetMessage () error{
 	betRegister := c.config.BetRegister
-	payload_msg := betRegister.toBetMessage()
-	msgWithHeader := fmt.Sprintf("%d,%s,%s", len(payload_msg) - 2,c.config.ID,payload_msg)
+	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
+	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
+	return c.sendMessage(msgWithHeader);
+}
+
+// openFile opens the agency file in path: config.BetFilePath
+// returns error in case that it couldnt open the file
+func (c *Client) openFile() (*os.File, error) {
+	filePath := c.config.BetFilePath
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Errorf("action: open_bet_file | result: fail | client_id: %v | error: %v",c.config.ID,err,)
+		return nil,err
+	}
+	return file,nil
+}
+
+// closeFile closes an open agency file
+// returns error in case that it couldnt close the file
+func (c *Client) closeFile(file *os.File) error{
+	err := file.Close()
+	if err != nil {
+		log.Errorf("action: close_bet_file | result: fail | client_id: %v | error: %v",c.config.ID,err,)
+		return err
+	}
+	return nil
+}
+
+// sendFinMessages sends a FIN messages to the server
+func (c *Client) sendFinMessage() error{
+	payload_msg := c.config.ID + ",FIN"
+	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
 	return c.sendMessage(msgWithHeader);
 }
 
@@ -136,6 +170,9 @@ func (c *Client) StartClientLoop() {
 	finish_channel := make(chan bool, 1)
 	go sigterm_handler(sigs,finish_channel, c)
 
+	bet_file,_ := c.openFile()
+	bet_reader := csv.NewReader(bet_file)
+
 loop:
 	// Send messages if the loopLapse threshold has not been surpassed
 	for timeout := time.After(c.config.LoopLapse); ; {
@@ -147,8 +184,6 @@ loop:
 			break loop
 		case <- finish_channel:
 			log.Infof("action: Exiting loop | result: success | client_id: %v",c.config.ID,)
-			close(finish_channel)
-			close(sigs)
 			break loop
 
 		default:
@@ -156,16 +191,37 @@ loop:
 
 		// Create the connection the server in every loop iteration.
 		c.createClientSocket()
-		send_error := c.sendBetMessage()
-		if send_error !=nil{
-			return
+		amount, _ := strconv.Atoi(c.config.BetAmount)
+		bets, read_chunk_err := readChunkFromFile(bet_reader, amount)
+
+		if read_chunk_err != nil && read_chunk_err != io.EOF{
+			c.sendFinMessage()
+			break loop
 		}
-		_, err := c.receiveMessage()
-		if err != nil {
-			return
+		for i, bet := range bets {
+			c.config.BetRegister = bet
+			send_error := c.sendBetMessage()
+			if send_error !=nil{
+				break loop
+			}
+			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+
+			if i == len(bets)-1 {
+				send_error := c.sendFinMessage()
+				if send_error != nil{
+					break loop
+				}
+				_, err := c.receiveMessage()
+				if err != nil {
+					break loop
+				}
+			}
 		}
-		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
-		
+
+		// If all bets were sent, end loop
+		if read_chunk_err == io.EOF {
+			break loop
+		}
 		msgID++
 		c.conn.Close()
 
@@ -173,5 +229,9 @@ loop:
 		time.Sleep(c.config.LoopPeriod)
 	}
 
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	c.conn.Close()
+	c.closeFile(bet_file)
+	close(finish_channel)
+	close(sigs)
+	log.Infof("action: loop_finished_gracefuly | result: success | client_id: %v", c.config.ID)
 }
