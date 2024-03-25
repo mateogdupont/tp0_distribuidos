@@ -13,65 +13,65 @@ services:
     volumes:
       - ./server/config.ini:/config.ini:ro
 
-  # client1:
-  #   container_name: client1
-  #   image: client:latest
-  #   entrypoint: /client
-  #   environment:
-  #     - CLI_ID=1
-  #     - CLI_LOG_LEVEL=DEBUG
-  #     - CLI_NAME=NOMBRE1
-  #     - CLI_LASTNAME=APELLIDO1
-  #     - CLI_DOCUMENT=43000001
-  #     - CLI_BIRTHDATE=1999-03-17
-  #     - CLI_NUMBER=1000
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #   volumes:
-  #     - ./client/config.yaml:/config.yaml:ro
-  #     - ./.data/agency-1.csv:/agency.csv:ro
+  client1:
+    container_name: client1
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=1
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_NAME=NOMBRE1
+      - CLI_LASTNAME=APELLIDO1
+      - CLI_DOCUMENT=43000001
+      - CLI_BIRTHDATE=1999-03-17
+      - CLI_NUMBER=1000
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml:ro
+      - ./.data/agency-1.csv:/agency.csv:ro
 
-  # client2:
-  #   container_name: client2
-  #   image: client:latest
-  #   entrypoint: /client
-  #   environment:
-  #     - CLI_ID=2
-  #     - CLI_LOG_LEVEL=DEBUG
-  #     - CLI_NAME=NOMBRE2
-  #     - CLI_LASTNAME=APELLIDO2
-  #     - CLI_DOCUMENT=43000002
-  #     - CLI_BIRTHDATE=1999-03-17
-  #     - CLI_NUMBER=2000
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #   volumes:
-  #     - ./client/config.yaml:/config.yaml:ro
-  #     - ./.data/agency-2.csv:/agency.csv:ro
+  client2:
+    container_name: client2
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=2
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_NAME=NOMBRE2
+      - CLI_LASTNAME=APELLIDO2
+      - CLI_DOCUMENT=43000002
+      - CLI_BIRTHDATE=1999-03-17
+      - CLI_NUMBER=2000
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml:ro
+      - ./.data/agency-2.csv:/agency.csv:ro
 
-  # client3:
-  #   container_name: client3
-  #   image: client:latest
-  #   entrypoint: /client
-  #   environment:
-  #     - CLI_ID=3
-  #     - CLI_LOG_LEVEL=DEBUG
-  #     - CLI_NAME=NOMBRE3
-  #     - CLI_LASTNAME=APELLIDO3
-  #     - CLI_DOCUMENT=43000003
-  #     - CLI_BIRTHDATE=1999-03-17
-  #     - CLI_NUMBER=3000
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #   volumes:
-  #     - ./client/config.yaml:/config.yaml:ro
-  #     - ./.data/agency-3.csv:/agency.csv:ro
+  client3:
+    container_name: client3
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=3
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_NAME=NOMBRE3
+      - CLI_LASTNAME=APELLIDO3
+      - CLI_DOCUMENT=43000003
+      - CLI_BIRTHDATE=1999-03-17
+      - CLI_NUMBER=3000
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml:ro
+      - ./.data/agency-3.csv:/agency.csv:ro
 
   client4:
     container_name: client4
@@ -93,25 +93,25 @@ services:
       - ./client/config.yaml:/config.yaml:ro
       - ./.data/agency-4.csv:/agency.csv:ro
 
-  # client5:
-  #   container_name: client5
-  #   image: client:latest
-  #   entrypoint: /client
-  #   environment:
-  #     - CLI_ID=5
-  #     - CLI_LOG_LEVEL=DEBUG
-  #     - CLI_NAME=NOMBRE5
-  #     - CLI_LASTNAME=APELLIDO5
-  #     - CLI_DOCUMENT=43000005
-  #     - CLI_BIRTHDATE=1999-03-17
-  #     - CLI_NUMBER=5000
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #   volumes:
-  #     - ./client/config.yaml:/config.yaml:ro
-  #     - ./.data/agency-5.csv:/agency.csv:ro
+  client5:
+    container_name: client5
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=5
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_NAME=NOMBRE5
+      - CLI_LASTNAME=APELLIDO5
+      - CLI_DOCUMENT=43000005
+      - CLI_BIRTHDATE=1999-03-17
+      - CLI_NUMBER=5000
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml:ro
+      - ./.data/agency-5.csv:/agency.csv:ro
 
   tester:
     container_name: tester
