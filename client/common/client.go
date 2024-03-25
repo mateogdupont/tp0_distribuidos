@@ -16,6 +16,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const FIN = ",FIN"
+const READY = ",READY"
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
@@ -31,6 +34,7 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
+	winners []int
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -65,7 +69,8 @@ func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	finish_channel <- true
 }
 
-func (c *Client)sendMessage (msg string) error{
+func (c *Client)sendMessage (payload_msg string) error{
+	msg := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
 	remainSize := len(msg)
 
 	for remainSize > 0 {
@@ -98,7 +103,6 @@ func (c *Client)receiveMessage () (string, error){
 			return "", err
 		}
 		partialMsg = strings.TrimRight(partialMsg, "\r\n")
-
 		if partialMsg == "" {
 			break
 		}
@@ -118,16 +122,32 @@ func (c *Client)receiveMessage () (string, error){
 			}
 		}
 	}
-	log.Infof("action: receive_messsage | result: success | msg: %v",completeMsg,)
+	log.Infof("action: receive_message | result: success | msg: %v",completeMsg,)
 	return completeMsg, nil
 }
 
+func (c *Client)receiveWinners() error{
+	for {
+		winnerMsg, _ := c.receiveMessage()
+		if winnerMsg == ""{
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d",len(c.winners),)
+			break
+		}
+		splitMsg := strings.Split(winnerMsg, ",")
+		winnersDocument, err := strconv.Atoi(splitMsg[1])
+		if err != nil {
+			log.Errorf("action: receive_winner | result: fail")
+			return err
+		}
+		c.winners = append(c.winners, winnersDocument)
+	}
+	return nil
+}
 
 func (c *Client)sendBetMessage () error{
 	betRegister := c.config.BetRegister
 	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
-	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
-	return c.sendMessage(msgWithHeader);
+	return c.sendMessage(payload_msg);
 }
 
 // openFile opens the agency file in path: config.BetFilePath
@@ -153,11 +173,16 @@ func (c *Client) closeFile(file *os.File) error{
 	return nil
 }
 
-// sendFinMessages sends a FIN messages to the server
+// sendFinMessage sends a FIN messages to the server
 func (c *Client) sendFinMessage() error{
-	payload_msg := c.config.ID + ",FIN"
-	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
-	return c.sendMessage(msgWithHeader);
+	payload_msg := c.config.ID + FIN
+	return c.sendMessage(payload_msg);
+}
+
+// sendReadyMessage sends a READY messages to the server
+func (c *Client) sendReadyMessage() error{
+	payload_msg := c.config.ID + READY
+	return c.sendMessage(payload_msg);
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
@@ -207,20 +232,29 @@ loop:
 			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 
 			if i == len(bets)-1 {
-				send_error := c.sendFinMessage()
-				if send_error != nil{
+				var send_error error
+				if read_chunk_err == io.EOF{
+					send_error = c.sendReadyMessage()
+					if send_error != nil{
+						break loop
+					}
+					_, err := c.receiveMessage()
+					if err != nil {
+						break loop
+					}
+					c.receiveWinners()
 					break loop
-				}
-				_, err := c.receiveMessage()
-				if err != nil {
-					break loop
+				}else{
+					send_error = c.sendFinMessage()
+					if send_error != nil{
+						break loop
+					}
+					_, err := c.receiveMessage()
+					if err != nil {
+						break loop
+					}
 				}
 			}
-		}
-
-		// If all bets were sent, end loop
-		if read_chunk_err == io.EOF {
-			break loop
 		}
 		msgID++
 		c.conn.Close()
@@ -228,7 +262,6 @@ loop:
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 	}
-
 	c.conn.Close()
 	c.closeFile(bet_file)
 	close(finish_channel)

@@ -8,6 +8,11 @@ STORAGE_FILEPATH = "./bets.csv"
 """ Simulated winner number in the lottery contest. """
 LOTTERY_WINNER_NUMBER = 7574
 
+FIN_MSG = "FIN"
+READY_MSG = "READY"
+FIN_MSG_SIZE = "5"
+READY_MSG_SIZE = "7"
+
 
 """ A lottery bet registry. """
 class Bet:
@@ -57,6 +62,12 @@ def load_bets() -> list[Bet]:
 
 def is_end_msg(msg: str) -> bool:
     split_msg = msg.split(',', 2)
-    if split_msg[0] == "5" and split_msg[2] == "FIN":
+    if split_msg[0] == FIN_MSG_SIZE and split_msg[2] == FIN_MSG:
+        return True
+    return False
+
+def is_ready_msg(msg: str) -> bool:
+    split_msg = msg.split(',', 2)
+    if split_msg[0] == READY_MSG_SIZE and split_msg[2] == READY_MSG:
         return True
     return False

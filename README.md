@@ -162,14 +162,22 @@ Adicionalmente, se menciona que se modifico el protocolo de comunicacion levemen
 #### Ejecucion del ejercicio 6:
 Al igual que el ejercicio 5 se deben utilizar los comandos `make docker-compose-up` para levantar los containers (5 clientes y 1 servidor), `make docker-compose-logs` y `make docker-compose-down` para terminar de forma graceful con todos los containers.
 
-### Ejercicio N°7:
-Modificar los clientes para que notifiquen al servidor al finalizar con el envío de todas las apuestas y así proceder con el sorteo.
-Inmediatamente después de la notificacion, los clientes consultarán la lista de ganadores del sorteo correspondientes a su agencia.
-Una vez el cliente obtenga los resultados, deberá imprimir por log: `action: consulta_ganadores | result: success | cant_ganadores: ${CANT}`.
+### Resolucion ejercicio N°7:
 
-El servidor deberá esperar la notificación de las 5 agencias para considerar que se realizó el sorteo e imprimir por log: `action: sorteo | result: success`.
-Luego de este evento, podrá verificar cada apuesta con las funciones `load_bets(...)` y `has_won(...)` y retornar los DNI de los ganadores de la agencia en cuestión. Antes del sorteo, no podrá responder consultas por la lista de ganadores.
-Las funciones `load_bets(...)` y `has_won(...)` son provistas por la cátedra y no podrán ser modificadas por el alumno.
+Para la resolucion de este ejercicio se modifica levemente el protocolo añadiendo un nuevo tipo de mensaje. Este tipo de mensaje es READY y es enviado por el cliente cuando finaliza el envio de todos los chunks. De esta forma, se tiene un mensaje de FIN para el caso donde se termina de enviar un chunk del archivo y un mensaje READY para cuando se termino de enviar el ultimo chunk. Es importante aclarar que al enviar el ultimo chunk, unicmanete se envia el mensaje READY, es decir, no se enviara el mensaje FIN. 
+
+Se barajo la posibilidad de utilizar un flag e incluirlo en el header, el cual adopte un valor al momento de que el cliente se encuentra en estado ready, sin embargo por motivos de tiempo y facilidad de implementacion respecto al protocolo existente se opto por un mensaje especial.
+
+
+Pasando al funcionamiento de parte del cliente, al finalizar el envio de todas las apuestas se queda a la espera de los ganadores. Estos llegaran como con el dato del DNI en el payload del mensaje, de esta forma el cliente lee el mensaje y agrega el DNI a la lista de ganadores. Cuando se detecte que el servidor cerro el canal de comunicaciones, se asume que no hay mas ganadores.
+
+
+Desde el punto de vista del servidor, se añade el soporte para el nuevo tipo de mensaje (READY). Cuando se detecta este mensaje, se guarda el socket en un diccionario llamado `_ready_clients` cuyas claves son los ID de los clientes y los valores sus respectivos sockes. Simplemente a modo de aclaracion, se penso en cerrar la conexion y que luego el servidor inicie una conexion con el cliente, sin embargo, no consideraba que sea correcto que el servidor inicie la conexion. 
+El servidor cuenta con una constante con la cantidad total de clientes, por lo tanto cuando se detecta que el tamaño del diccionario es igual a la cantidad de dicha constante, se utiliza la funcion `_send_winners` la cual utiliza filter junto a la funcion `load_bets` y `has_won` para iterar sobre los bets del archivo (evitando cargarlos todos en memoria simultaneamente) y luego se envia el documento a cada cliente segun el ID guardado en la bet empleando el diccionario anteriormente mecionado. Al enviar todos los ganadores, se cierran todos los sockets.
+
+
+#### Ejecucion del ejercicio 7:
+Se ejecuta de la misma manera que el ejercicio 6.
 
 ## Parte 3: Repaso de Concurrencia
 
