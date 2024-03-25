@@ -48,7 +48,7 @@ class Server:
             if ',' in complete_msg:
                 split_msg = complete_msg.split(',', 1)
                 expected_byte_size = int(split_msg[0])
-                received_payload_size = len(split_msg[1])
+                received_payload_size = len(split_msg[1].encode('utf-8'))
                 if received_payload_size >= expected_byte_size:
                     break
         
@@ -63,7 +63,7 @@ class Server:
         remaind_size = len(ack_message)
 
         while remaind_size > 0:
-            sent_data_size = client_sock.send(ack_message)
+            sent_data_size = client_sock.send(ack_message.encode('utf-8'))
             if sent_data_size == 0:
                 logging.error("action: send_message | result: fail | error: {e}")
                 break
@@ -86,7 +86,7 @@ class Server:
             msg = self._receive_message(client_sock)
             if not msg.strip():
                 return
-            self.procces_message(msg)
+            self._procces_message(msg)
             self._send_ack_message(client_sock,msg)
 
         except OSError as e:

@@ -121,8 +121,8 @@ func (c *Client)receiveMessage () (string, error){
 
 func (c *Client)sendBetMessage () error{
 	betRegister := c.config.BetRegister
-	payload_msg := betRegister.toBetMessage()
-	msgWithHeader := fmt.Sprintf("%d,%s,%s", len(payload_msg) - 2,c.config.ID,payload_msg)
+	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
+	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg) ,payload_msg)
 	return c.sendMessage(msgWithHeader);
 }
 
@@ -147,8 +147,6 @@ loop:
 			break loop
 		case <- finish_channel:
 			log.Infof("action: Exiting loop | result: success | client_id: %v",c.config.ID,)
-			close(finish_channel)
-			close(sigs)
 			break loop
 
 		default:
@@ -158,11 +156,11 @@ loop:
 		c.createClientSocket()
 		send_error := c.sendBetMessage()
 		if send_error !=nil{
-			return
+			break loop
 		}
 		_, err := c.receiveMessage()
 		if err != nil {
-			return
+			break loop
 		}
 		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 		
@@ -172,6 +170,8 @@ loop:
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 	}
-
+	c.conn.Close()
+	close(finish_channel)
+	close(sigs)
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
