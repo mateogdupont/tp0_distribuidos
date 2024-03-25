@@ -4,8 +4,7 @@ import signal
 
 from common.utils import *
 
-#TODO: CHANGE TO 5
-TOTAL_AMOUNT_OF_CLIENTS = 1
+TOTAL_AMOUNT_OF_CLIENTS = 5
 
 class Server:
     def __init__(self, port, listen_backlog):
