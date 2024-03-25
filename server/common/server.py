@@ -50,8 +50,9 @@ class Server:
         return complete_header
 
     def _receive_message(self, client_sock):
-
         header = self._receive_header(client_sock)
+        if not header:
+            return ""
         expected_payload_size = int(header[:-1])
         complete_msg = header
         while True:

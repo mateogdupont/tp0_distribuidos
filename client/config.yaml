@@ -2,8 +2,8 @@
 server:
   address: "server:12345"
 loop:
-  lapse: "15m0s"
-  period: "5s"
+  lapse: "60m0s"
+  period: "3s"
 log:
   level: "info"
 bets:

@@ -146,16 +146,18 @@ En primer lugar, para calcular la cantidad de apuestas que es posible enviar en 
 - birthdate: Longitud maxima de 10 caracteres (10 bytes.)
 - number: Se asume que el numero maximo es 9999 por lo que es un entero de 4 digitos (4 bytes).
 
-Por lo tanto, al sumarle los separdores (',') y el tamaño del header (numero entero de 3 digitos) el mensaje mas largo posible seria de aproximadamente de 280 bytes.
+Por lo tanto, al sumarle los separadores (',') y el tamaño del header (numero entero de 3 digitos) el mensaje mas largo posible seria de aproximadamente de 280 bytes.
 
 
 280 bytes > MAX_LEN_AGENCY + MAX_LEN_NAME + MAX_LEN_LASTNAME + MAX_LEN_DOCUMENT + MAX_LEN_BIRTHDATE + MAX_LEN_NUMBER + LEN_ADD_BY_PROTOCOL + LEN_MAX_HEADER
 
 280bytes > 4bytes + 120bytes + 120bytes + 8bytes + 10bytes + 4bytes + 7bytes + 4bytes
 
-Si tomamos 280bytes como cota para la cantidad de apuestas que se pueden realziar en un chunk, entonces podriamos realizar hasta un maximo de 27 apuestas por chunk. Nuevamente, se hace mencion al apartado del punto 5 donde se plantea que es posible reducir el tamaño de los mensajes mediante la modificacion del protocolo
+Si tomamos 280bytes como cota para la cantidad de apuestas que se pueden realizar en un chunk, entonces podriamos realizar hasta un maximo de 27 apuestas por chunk. Nuevamente, se hace mencion al apartado del punto 5 donde se plantea que es posible reducir el tamaño de los mensajes mediante la modificacion del protocolo.
 
-Adicionalmente, se menciona que se modifico el protolo de comunicacion levemente para poder adaptarlo a este ejercicio. Aqui se agrego un nuevo mensjae de cuyo payload es 'FIN' con el objetivo de avisarle al servidor que se finalizo el envio de datos por lo que el servidor puede enviarle el ACK del chunk completo. Este ACK tambien fue modificado y ahora envia la cantidad de paquetes que se procesaron en el chunk. Cabe aclara que a medida que los paquetes le llegan al servidor, el mismo los va procesando y no espera a tener todo el chunk completo para inciiar el procesamiento para evirar tener cargados en memoria todos esos datos en caso de utilizar chunks muy grandes.
+En lo que respecta a las constantes como la cantidad de apuestas por chunks o el path del archivo el cual deberan utilizar los clientes, se añadieron en el archivo de configuracion llamado config.yaml. Se hace especial mencion a la modificacion del loop lapse aumentando su valor para asegurar que todas las apuestas lleguen al servidor.
+
+Adicionalmente, se menciona que se modifico el protocolo de comunicacion levemente para poder adaptarlo a este ejercicio. Aqui se agrego un nuevo mensaje de cuyo payload es 'FIN' con el objetivo de avisarle al servidor que se finalizo el envio de datos por lo que el servidor puede enviarle el ACK del chunk completo. Este ACK tambien fue modificado y ahora envia la cantidad de paquetes que se procesaron en el chunk. Cabe aclara que a medida que los paquetes le llegan al servidor, el mismo los va procesando y no espera a tener todo el chunk completo para inciar el procesamiento para evitar tener cargados en memoria todos esos datos en caso de utilizar chunks muy grandes.
 
 #### Ejecucion del ejercicio 6:
 Al igual que el ejercicio 5 se deben utilizar los comandos `make docker-compose-up` para levantar los containers (5 clientes y 1 servidor), `make docker-compose-logs` y `make docker-compose-down` para terminar de forma graceful con todos los containers.
