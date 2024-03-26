@@ -65,8 +65,8 @@ client1 exited with code 0
 ## Parte 1: Introducción a Docker
 En esta primera parte del trabajo práctico se plantean una serie de ejercicios que sirven para introducir las herramientas básicas de Docker que se utilizarán a lo largo de la materia. El entendimiento de las mismas será crucial para el desarrollo de los próximos TPs.
 
-### Ejercicio N°1:
-Modificar la definición del DockerCompose para agregar un nuevo cliente al proyecto.
+### Resolucion ejercicio N°1:
+Se modifica el archivo DockerCompose para agregar un nuevo cliente al proyecto.  
 
 ### Resolucion ejercicio N°1.1:
 Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" el cual crea una cantidad N de clientes. El mismo debe ser ejecutado de la siguinete manera:
@@ -75,7 +75,7 @@ Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" e
 ### Resolucion Ejercicio N°2:
 Se agrega al archivo docker-compose-dev los volumenes para el server y de los clientes, con el fin de vincular los archivos de la maquina host con los archivos del container. Siendo estos archivos `config.ini` para el server y `config.yaml` para el cliente. En la declaracion del volumen unicamente se comparten dichos archivos, es decir, no se comparte toda la carpeta. Asi mismo, se aclara que se opto por volumenes sin nombre o tambien llamados anonimos.
 
-Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de añadir los volumenes.
+Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de añadir los volumenes.  
 
 Se verifica el correcto funcionamiento al realizar 'make docker-compose-up' con 'docker-image' comentado y corroborando los cambios realizados en la configuracion del servidor y de los clientes sin necesidad de realizar un nuevo build de las imagenes.
 
