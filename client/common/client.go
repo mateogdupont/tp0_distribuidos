@@ -79,8 +79,6 @@ loop:
 			break loop
 		case <- finish_channel:
 			log.Infof("action: Exiting loop | result: success | client_id: %v",c.config.ID,)
-			close(finish_channel)
-			close(sigs)
 			break loop
 
 		default:
@@ -105,7 +103,7 @@ loop:
                 c.config.ID,
 				err,
 			)
-			return
+			break loop
 		}
 		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
             c.config.ID,
@@ -115,6 +113,8 @@ loop:
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 	}
-
+	c.conn.Close()
+	close(finish_channel)
+	close(sigs)
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
