@@ -65,8 +65,8 @@ client1 exited with code 0
 ## Parte 1: Introducción a Docker
 En esta primera parte del trabajo práctico se plantean una serie de ejercicios que sirven para introducir las herramientas básicas de Docker que se utilizarán a lo largo de la materia. El entendimiento de las mismas será crucial para el desarrollo de los próximos TPs.
 
-### Ejercicio N°1:
-Modificar la definición del DockerCompose para agregar un nuevo cliente al proyecto.
+### Resolucion ejercicio N°1:
+Se modifica el archivo DockerCompose para agregar un nuevo cliente al proyecto.
 
 ### Ejercicio N°1.1:
 Definir un script (en el lenguaje deseado) que permita crear una definición de DockerCompose con una cantidad configurable de clientes.
