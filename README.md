@@ -79,8 +79,18 @@ Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de a�
 
 Se verifica el correcto funcionamiento al realizar 'make docker-compose-up' con 'docker-image' comentado y corroborando los cambios realizados en la configuracion del servidor y de los clientes sin necesidad de realizar un nuevo build de las imagenes.
 
-### Ejercicio N°3:
-Crear un script que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un EchoServer, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado. Netcat no debe ser instalado en la máquina _host_ y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`).
+### Resolucion ejercicio N°3:
+
+Ejecutar `./server_validation.sh`.
+
+El script `server_validation.sh` se encarga de levantar los containers del server y del cliente de prueba junto a la network que los conecta. Una vez iniciados ambos containers, se instala netcat en el cliente de prueba y tras ello se ejecuta en la bash del container el siguiente comando:  
+`if [ "$(echo "Test01" | nc server 12345)" = "Test01" ]; then echo "OK"; else echo "Error"; fi`
+
+Este comando muestra `OK` por la terminal en caso de exito o `Error` en caso de error. El funcionamiento del comando se basa en una estrucuta if, donde la condicion de verdad es la igualdad del resultado esperado (Test01) al ejecutar el comando nc server 12345 con 'Test01' como entrada. 
+
+Continuando con `$(echo "Test01" | nc server 12345)`, aqui capturamos el resultado de la ejecucion de las instrucciones entre parentesis. Se envia por stdin "Test01" al comando "nc server 12345" para enviar el mensaje "Test01" a la IP "server" (configurada en el archivo config.ini del server) en el puerto 12345.
+
+Por ultimo, se detienen y eliminan los containers utilizados para la prueba.
 
 ### Ejercicio N°4:
 Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).

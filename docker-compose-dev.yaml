@@ -41,6 +41,15 @@ services:
     volumes:
       - ./client/config.yaml:/config.yaml:ro
 
+  tester:
+    container_name: tester
+    image: ubuntu:latest
+    command: tail -f /dev/null
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
 networks:
   testing_net:
     ipam:
