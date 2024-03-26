@@ -1,7 +1,7 @@
 import csv
 import datetime
 import time
-
+from multiprocessing import Process, Pipe, Lock
 
 """ Bets storage location. """
 STORAGE_FILEPATH = "./bets.csv"
@@ -60,14 +60,42 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
-def is_end_msg(msg: str) -> bool:
+def is_fin_msg(msg: str) -> bool:
     split_msg = msg.split(',', 2)
-    if split_msg[0] == FIN_MSG_SIZE and split_msg[2] == FIN_MSG:
-        return True
-    return False
+    return split_msg[0] == FIN_MSG_SIZE and split_msg[2] == FIN_MSG
 
 def is_ready_msg(msg: str) -> bool:
     split_msg = msg.split(',', 2)
-    if split_msg[0] == READY_MSG_SIZE and split_msg[2] == READY_MSG:
-        return True
-    return False
+    return split_msg[0] == READY_MSG_SIZE and split_msg[2] == READY_MSG
+
+def is_end_msg(msg: str) -> bool:
+    return is_fin_msg(msg) or is_ready_msg(msg)
+
+def get_client_id(msg: str) -> int:
+    client_id = msg.split(',', 2)[1]
+    return int(client_id)
+
+class ProcessManager:
+    def __init__(self, client_handler, file_lock, client_sock):
+        """
+        Initialize processManager and start a new proccess
+        """
+        manager_pipe, process_receiver = Pipe()
+        self.pipe = manager_pipe
+        self.client_id = 0
+        self.client_socket = client_sock 
+        self.process = Process(target=client_handler, args=(client_sock,file_lock, process_receiver))
+        self.process.start()
+        process_receiver.close()
+
+    def join(self):
+        self.process.join()
+
+    def finish(self):
+        self.pipe.close()
+        self.client_socket.close()
+        self.join()
+    
+    def set_own_id(self):
+        id = self.pipe.recv()
+        self.client_id = int(id)
