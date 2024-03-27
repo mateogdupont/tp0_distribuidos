@@ -172,7 +172,7 @@ Al igual que el ejercicio 5 se deben utilizar los comandos `make docker-compose-
 
 ### Resolucion ejercicio N°7:
 
-Para la resolucion de este ejercicio se modifica levemente el protocolo añadiendo un nuevo tipo de mensaje. Este tipo de mensaje es READY y es enviado por el cliente cuando finaliza el envio de todos los chunks. De esta forma, se tiene un mensaje de FIN para el caso donde se termina de enviar un chunk del archivo y un mensaje READY para cuando se termino de enviar el ultimo chunk. Es importante aclarar que al enviar el ultimo chunk, unicmanete se envia el mensaje READY, es decir, no se enviara el mensaje FIN. 
+Para la resolucion de este ejercicio se modifica levemente el protocolo añadiendo un nuevo tipo de mensaje. Este tipo de mensaje es READY y es enviado por el cliente cuando finaliza el envio de todos los chunks. De esta forma, se tiene un mensaje de FIN para el caso donde se termina de enviar un chunk del archivo y un mensaje READY para cuando se termino de enviar el ultimo chunk. Es importante aclarar que al enviar el ultimo chunk, unicmanete se envia el mensaje READY, es decir, no se enviara el mensaje FIN.
 
 Se barajo la posibilidad de utilizar un flag e incluirlo en el header, el cual adopte un valor al momento de que el cliente se encuentra en estado ready, sin embargo por motivos de tiempo y facilidad de implementacion respecto al protocolo existente se opto por un mensaje especial.
 
@@ -180,7 +180,7 @@ Se barajo la posibilidad de utilizar un flag e incluirlo en el header, el cual a
 Pasando al funcionamiento de parte del cliente, al finalizar el envio de todas las apuestas se queda a la espera de los ganadores. Estos llegaran como con el dato del DNI en el payload del mensaje, de esta forma el cliente lee el mensaje y agrega el DNI a la lista de ganadores. Cuando se detecte que el servidor cerro el canal de comunicaciones, se asume que no hay mas ganadores.
 
 
-Desde el punto de vista del servidor, se añade el soporte para el nuevo tipo de mensaje (READY). Cuando se detecta este mensaje, se guarda el socket en un diccionario llamado `_ready_clients` cuyas claves son los ID de los clientes y los valores sus respectivos sockes. Simplemente a modo de aclaracion, se penso en cerrar la conexion y que luego el servidor inicie una conexion con el cliente, sin embargo, no consideraba que sea correcto que el servidor inicie la conexion. 
+Desde el punto de vista del servidor, se añade el soporte para el nuevo tipo de mensaje (READY). Cuando se detecta este mensaje, se guarda el socket en un diccionario llamado `_ready_clients` cuyas claves son los ID de los clientes y los valores sus respectivos sockes. Simplemente a modo de aclaracion, se penso en cerrar la conexion y que luego el servidor inicie una conexion con el cliente, sin embargo, no consideraba que sea correcto que el servidor inicie la conexion.
 El servidor cuenta con una constante con la cantidad total de clientes, por lo tanto cuando se detecta que el tamaño del diccionario es igual a la cantidad de dicha constante, se utiliza la funcion `_send_winners` la cual utiliza filter junto a la funcion `load_bets` y `has_won` para iterar sobre los bets del archivo (evitando cargarlos todos en memoria simultaneamente) y luego se envia el documento a cada cliente segun el ID guardado en la bet empleando el diccionario anteriormente mecionado. Al enviar todos los ganadores, se cierran todos los sockets.
 
 
@@ -189,16 +189,19 @@ Se ejecuta de la misma manera que el ejercicio 6.
 
 ## Parte 3: Repaso de Concurrencia
 
-### Ejercicio N°8:
-Modificar el servidor para que permita aceptar conexiones y procesar mensajes en paralelo.
-En este ejercicio es importante considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de la persistencia.
+### Resolucion ejercicio N°8:
 
-En caso de que el alumno implemente el servidor Python utilizando _multithreading_,  deberán tenerse en cuenta las [limitaciones propias del lenguaje](https://wiki.python.org/moin/GlobalInterpreterLock).
+Dado que en este ejercicio el servidor atiende a los clientes de forma concurrente, no es necesario finalizar las conexiones de los clientes. De esta manera, se modifica al cliente para no cerrar la conexion.  
+#### Funcionamiento del proceso padre del servidor:
+En lo que respecta a las modificaciones en el servidor, se agrega el objeto `ProcessManager` el cual es la abstraccion encargada de un proceso hijo del server. El proceso padre quedara a la espera de conexiones y cuando llegue una conexion crea una instancia de ProcessManager que contiene el pipe por el que se va a comunicar con el proceso hijo junto al socket de dicho cliente y el id.  
+Este ultimo atributo, se inicializa en un valor invalido (`0`) ya que debera ser cargado por el propio hijo durante su ejecucion.  
+Cuando el servidor cree una cantidad de `TOTAL_AMOUNT_OF_CLIENTS` de instancias de ProcessManager significa que todos los clientes estan conectados por lo que se procede a cargarles el ID correcto a cada ProcessManager. Como explicare mas adelante, este proceso tiene dos finalizades siendo el primero el asignarle un cliente especifico a un ProcessManager y de esta forma unicamente mandarle los ganadores correspondientes a dicha agencia. La segunda funcionalidad que tiene el hecho de configurar el ID es avisar al proceso padre que el cliente finalizo de enviar las apuestas.  
+De esta forma, cuando se configuran los ID en ProcessManager el proceso padre tiene la certeza de que puede realizar la loteria ya que no queda ninguna apuesta sin registrar. Otra posible solucion, seria en lugar de mandar el ID, que el proceso hijo le mande un bool cuando este listo para realizar la loteria aunque luego el proceso padre le deberia enviar a todos los hijos todos los ganadores y seria responsabilidad de ellos tomar unicamente los que necesitan. Por ultimo, se menciona que seria posible definir un protocolo mas complejo para el intercambio de informacion entre el padre y el hijo que logre el mismo resultado de manera mas clara sin embargo por motivos de tiempo se opto por la convencion anteriormente mencionada.  
+Continuando con la logica del padre, cuando todos los ProcessManager tienen sus ID cargados se procede a la obtencion de los ganadores y luego al envio de los ganadores a los respectivos hijos. Tras ello, se realiza un graceful finish de los procesos hijos y se eliminan de la lista de procesos permitiendo al servidor continuar con el loop de aceptacion de clientes.  
+Cabe aclarar que toda la comunicacion entre el proceso padre e hijo se realiza utilizando un `Pipe` bidireccional.  
+ 
+#### Funcionamiento del proceso hijo del servidor:
 
-## Consideraciones Generales
-Se espera que los alumnos realicen un _fork_ del presente repositorio para el desarrollo de los ejercicios.
-El _fork_ deberá contar con una sección de README que indique como ejecutar cada ejercicio.
-La Parte 2 requiere una sección donde se explique el protocolo de comunicación implementado.
-La Parte 3 requiere una sección que expliquen los mecanismos de sincronización utilizados.
-
-Finalmente, se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección provistos [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
+Como se menciono anteriormente, una vez creado el hijo el mismo permanece conectado al socket del cliente hasta el final de la comunicacion (donde le envia los ganadores). De esta forma, el proceso hijo quedara en un loop en el cual reciba las apuestas del cliente y en el momento en el que se finalize con la recepcion del total de las apuestas del cliente, se enviara al padre el ID del cliente que esta atendiendo.  
+Tras enviarle el ID del su cliente al padre el proceso queda a la espera de los ganadores que leera del propio Pipe que lo conecta con el proceso padre. Cuando se terminen de recibir todos los ganadores, se procede a enviarlos hacia el cliente y finalizar su ciclo de vida permitiendo que el proceso padre le pueda realizar un `join()`.  
+En lo que respecta al acceso del archivo de bets.csv, se utiliza un lock para garantizar que unicamente un proceso pueda acceder al mismo y de esta forma todos los proceso hijos pueden recibir apuestas que las almacenaran cuando obtengan el lock.

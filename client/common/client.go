@@ -62,9 +62,13 @@ func (c *Client) createClientSocket() error {
 
 func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	<-sigs
-	c.conn.Close()
-	log.Infof("action: Handling SIGTERM | result: success | client_id: %v",c.config.ID,)
-	finish_channel <- true
+	select {
+    case finish_channel <- true:
+		c.conn.Close()
+		log.Infof("action: Handling SIGTERM | result: success | client_id: %v",c.config.ID,)
+    default:
+        return
+    }
 }
 
 func (c *Client)receiveWinners() error{
@@ -130,9 +134,6 @@ func (c *Client) sendReadyMessage() error{
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// autoincremental msgID to identify every message sent
-	msgID := 1
-
 	sigs := make (chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM);
 	finish_channel := make(chan bool, 1)
@@ -140,7 +141,8 @@ func (c *Client) StartClientLoop() {
 
 	bet_file,_ := c.openFile()
 	bet_reader := csv.NewReader(bet_file)
-
+	// Create the connection the server.
+	c.createClientSocket()
 loop:
 	// Send messages if the loopLapse threshold has not been surpassed
 	for timeout := time.After(c.config.LoopLapse); ; {
@@ -157,8 +159,6 @@ loop:
 		default:
 		}
 
-		// Create the connection the server in every loop iteration.
-		c.createClientSocket()
 		amount, _ := strconv.Atoi(c.config.BetAmount)
 		bets, read_chunk_err := readChunkFromFile(bet_reader, amount)
 
@@ -172,7 +172,7 @@ loop:
 			if send_error !=nil{
 				break loop
 			}
-			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+			//log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 
 			if i == len(bets)-1 {
 				var send_error error
@@ -199,8 +199,6 @@ loop:
 				}
 			}
 		}
-		msgID++
-		c.conn.Close()
 
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
