@@ -172,7 +172,7 @@ loop:
 			if send_error !=nil{
 				break loop
 			}
-			//log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 
 			if i == len(bets)-1 {
 				var send_error error

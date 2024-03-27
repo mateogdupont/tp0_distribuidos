@@ -105,7 +105,7 @@ def procces_message(msg, file_lock):
     bet = Bet.from_message(msg)
     with file_lock:
         store_bets([bet])
-    #logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+    logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
 def receive_chunk(client_sock,file_lock) -> tuple[int, str]:
     """
