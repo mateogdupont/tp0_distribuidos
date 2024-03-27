@@ -3,6 +3,7 @@ import logging
 import signal
 
 from common.utils import *
+from common.communications import *
 from multiprocessing import Process, Pipe, Lock
 
 TOTAL_AMOUNT_OF_CLIENTS = 5
@@ -90,22 +91,6 @@ class Server:
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
 
-def send_message(client_sock, payload):
-    payload_size = len(payload)
-    msg = "{},".format(payload_size) + payload + "\n"
-    remaind_size = len(msg)
-    while remaind_size > 0:
-        try:
-            sent_data_size = client_sock.send(msg.encode('utf-8'))
-        except (OSError, BrokenPipeError):
-            logging.error("action: send_message | result: fail")
-            break
-        if sent_data_size == 0:
-            logging.error("action: send_message | result: fail")
-            break
-        remaind_size -= sent_data_size
-        msg = msg[sent_data_size:]
-
 def send_ack_message(client_sock, msg):
     amount_to_ack = msg.split(',', 1)[0]
     payload_msg = "ACK:" + amount_to_ack
@@ -120,46 +105,7 @@ def procces_message(msg, file_lock):
     bet = Bet.from_message(msg)
     with file_lock:
         store_bets([bet])
-    logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
-   
-def receive_header(client_sock):
-    """
-    Read the header of a message
-    """
-    complete_header = ""
-    while True:
-        partial_header = client_sock.recv(1).decode('utf-8')
-        if not partial_header:
-            logging.error("action: receive_header | result: fail")
-            break
-        complete_header += partial_header
-        if partial_header == ',':
-            break
-    return complete_header
-
-
-def receive_message(client_sock):
-    header = receive_header(client_sock)
-    if not header:
-        return ""
-    expected_payload_size = int(header[:-1])
-    complete_msg = header
-    while True:
-        partial_msg = client_sock.recv(expected_payload_size).decode('utf-8')
-        if not partial_msg:
-            logging.error("action: receive_message | result: fail | error: {e}")
-            break
-
-        complete_msg += partial_msg
-        if ',' in complete_msg:
-            split_msg = complete_msg.split(',', 1)
-            received_payload_size = len(split_msg[1].encode('utf-8'))
-            if received_payload_size >= expected_payload_size:
-                break
-    
-    addr = client_sock.getpeername()
-    return complete_msg
-
+    #logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
 def receive_chunk(client_sock,file_lock) -> tuple[int, str]:
     """
@@ -189,6 +135,7 @@ def receive_and_send_winners(client_sock, pipe_with_manager):
         pipe_with_manager.close()
         for winners_document in winners:
             send_message(client_sock,winners_document)
+            receive_message(client_sock)
         client_sock.close()
         
 

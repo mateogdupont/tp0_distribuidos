@@ -93,8 +93,8 @@ class ProcessManager:
 
     def finish(self):
         self.pipe.close()
-        self.client_socket.close()
         self.join()
+        self.client_socket.close()
     
     def set_own_id(self):
         id = self.pipe.recv()

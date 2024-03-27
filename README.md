@@ -86,7 +86,7 @@ Ejecutar `./server_validation.sh`.
 El script `server_validation.sh` se encarga de levantar los containers del server y del cliente de prueba junto a la network que los conecta. Una vez iniciados ambos containers, se instala netcat en el cliente de prueba y tras ello se ejecuta en la bash del container el siguiente comando:  
 `if [ "$(echo "Test01" | nc server 12345)" = "Test01" ]; then echo "OK"; else echo "Error"; fi`
 
-Este comando muestra `OK` por la terminal en caso de exito o `Error` en caso de error. El funcionamiento del comando se basa en una estrucuta if, donde la condicion de verdad es la igualdad del resultado esperado (Test01) al ejecutar el comando nc server 12345 con 'Test01' como entrada. 
+Este comando muestra `OK` por la terminal en caso de exito o `Error` en caso de error. El funcionamiento del comando se basa en una estrucuta if, donde la condicion de verdad es la igualdad del resultado esperado (Test01) al ejecutar el comando nc server 12345 con 'Test01' como entrada.
 
 Continuando con `$(echo "Test01" | nc server 12345)`, aqui capturamos el resultado de la ejecucion de las instrucciones entre parentesis. Se envia por stdin "Test01" al comando "nc server 12345" para enviar el mensaje "Test01" a la IP "server" (configurada en el archivo config.ini del server) en el puerto 12345.
 
@@ -95,7 +95,7 @@ Por ultimo, se detienen y eliminan los containers utilizados para la prueba.
 ### Resolucion ejercicio N°4:
 Se agregan los handlers respectivos para el servidor y para el cliente para lograr obtener un graceful finish en caso de recibir una señal SIGTERM.
 
-En caso del servidor, se utiliza la libreria signal. Dicha libreria nos permite definir un handler que sera llamado al momento de recibir la señal SIGTERM, este handler cambia el estado de una variable interna de server. En el bucle principal del servidor se verifica el estado de dicha variable para salir del bucle en caso que corresponda. Tras esto, se cierran los recursos abiertos por el programa y se finaliza la ejecucion. 
+En caso del servidor, se utiliza la libreria signal. Dicha libreria nos permite definir un handler que sera llamado al momento de recibir la señal SIGTERM, este handler cambia el estado de una variable interna de server. En el bucle principal del servidor se verifica el estado de dicha variable para salir del bucle en caso que corresponda. Tras esto, se cierran los recursos abiertos por el programa y se finaliza la ejecucion.
 
 En el caso del cliente, se utilizan las librerias `os` y `syscall`. Previo al loop del cliente, se llama asincronicamente al handler de la señal, dicha señal proviene de un channel por lo que el handler al recibir dicho valor por el channel envia el valor true por un channel llamado "finish channel". Este segundo channel es escuchado por el loop principal mediante un select, lo que permite que al momento en el que se reciba el valor true por dicho canal se salga del loop cerrando correctamente los recursos del cliente.
 
@@ -118,9 +118,9 @@ Se agrega la funcion `_receive_message` la cual devuelve el mensaje leido desde 
 Por ultimo, se envia al cliente un ACK mediante la funcion `_send_ack_message` la cual evita el problema de short.write.
 
 #### Protocolo de Comunicación:
-En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, consiste en una estructura de mensaje que se compone de un header y un payload. 
+En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, consiste en una estructura de mensaje que se compone de un header y un payload.
 
-En primer lugar al header, unicamente tendremos el tamaño del payload. Este header se encuentra al inicio del mensaje y al igual que el resto de componentes se encuentra separador del mensaje por una coma. El header del mensaje se considera el tamaño minimo a leer del mensaje y en caso de que la lectura del mensaje no contenga al menos al header completo se debera enviar nuevamente.
+En primer lugar en el header, unicamente tendremos el tamaño del payload. Este header se encuentra al inicio del mensaje y al igual que el resto de componentes se encuentra separador del mensaje por una coma. El header del mensaje se considera el tamaño minimo a leer del mensaje y en caso de que la lectura del mensaje no contenga al menos al header completo se debera enviar nuevamente.
 
 Por otro lado, el payload contendra todos los campos correspondientes para el contenido del mensaje. En caso de ser un mensaje de apuesta, se compondra de los campos necesarios para realizar la apuesta con sus campos separados por una coma. Por otro lado, en caso de ser un mensaje de ACK se tendra la cadena "ACK" y el tamaño del paquete recibido anteriormente.
 
@@ -130,13 +130,19 @@ Ejemplo de mensaje de apuesta: payload_size,agency_id,name,lastname,document,bir
 Ejemplo de mensaje ACK: payload_size,ACK:size_of_received_message
 
 
-Simplemente a modo de aclaracion, se menciona que como convencion se opto por que en caso de que se detecte un error al enviar o recibir un mensjae, no se reenviara el mensaje. Por ejemplo, en caso de que al momento de enviar la apuesta, la funcion `Write` del socket falle, no se reenviara la apuesta.
+Simplemente a modo de aclaracion, se menciona que como convencion se opto por que en caso de que se detecte un error al enviar o recibir un mensjae, no se reenviara el mensaje. Por ejemplo, en caso de que al momento de enviar la apuesta, la funcion `Write` del socket falle, no se reenviara la apuesta.  
+En lo que respecta a la eleccion del protocolo, es importante destacar que si bien es muy simple de parsear gracias a los separadores, no es el mas eficiente. Esto ya que se podria haber optado por un protocolo con campos de tamaño fijo y campos de tamaño variable cuyos tamaños se prodrian agregar en el header (el cual nuevamente seria de un tamaño fijo). De esta forma se evita el envio de separadores y se realiza una mejor administracion de los recursos de la red. El motivo por el cual no se opto por esta ultima opcion fue simplemente el tiempo requerido para realizarlo.  
+
+#### Aclaracion importante respecto al protocolo:
+Existe una diferencia entre la implementacion del protoclo para el cliente y para el servidor. Esta consiste en el modo de lectura de un mensaje entrante, el servidor lo realiza de forma "correcta" es decir lee la informacion del socket hasta encontrar el separador del header y luego lee el tamaño que contenia dicho header. Sin embargo, el cliente lee una linea completa el socket.  
+Esta diferencia se basa en que mi implementacion es compatible con este modo de lectura ya que no se envia mas de un mensaje a la vez por parte del servidor. Soy conciente de que no es algo "prolijo" pero se realizo en pos de ahorrar tiempo y continuar con el resto de ejercicios ya que por la forma en la que se comunican en mi TP no traeria problemas. Esta claro que en caso de querer formalizar el protocolo se realizaria una correcta implementacion como la que posee el servidor. 
 
 #### Ejecucion del ejercicio 5:
 Se debe ejecutar `make docker-compose-up` para levantar los containers (5 clientes y 1 servidor) y luego ejecutar `make docker-compose-logs`. Por ultimo, para finalizar la ejecucion se debe utilizar el comando `make docker-compose-down` para terminar de forma graceful con todos los containers.
 
 ### Resolucion ejercicio N°6:
 
+#### Cantidad de apuestas por chunk
 En primer lugar, para calcular la cantidad de apuestas que es posible enviar en un chunk para no exceder los 8kB se toma al peor caso (apuesta mas larga) como cota de longitud y para ello se toman los siguientes parametros:
 
 - agency_id: Dado el alcance del trabajo practico, se toma como maximo cuatro digitos (4 bytes).
@@ -157,14 +163,16 @@ Si tomamos 280bytes como cota para la cantidad de apuestas que se pueden realiza
 
 En lo que respecta a las constantes como la cantidad de apuestas por chunks o el path del archivo el cual deberan utilizar los clientes, se añadieron en el archivo de configuracion llamado config.yaml. Se hace especial mencion a la modificacion del loop lapse aumentando su valor para asegurar que todas las apuestas lleguen al servidor.
 
-Adicionalmente, se menciona que se modifico el protocolo de comunicacion levemente para poder adaptarlo a este ejercicio. Aqui se agrego un nuevo mensaje de cuyo payload es 'FIN' con el objetivo de avisarle al servidor que se finalizo el envio de datos por lo que el servidor puede enviarle el ACK del chunk completo. Este ACK tambien fue modificado y ahora envia la cantidad de paquetes que se procesaron en el chunk. Cabe aclara que a medida que los paquetes le llegan al servidor, el mismo los va procesando y no espera a tener todo el chunk completo para inciar el procesamiento para evitar tener cargados en memoria todos esos datos en caso de utilizar chunks muy grandes.
+#### Modificaciones al protocolo de comunicacion
+
+Adicionalmente, se menciona que se modifico el protocolo de comunicacion levemente para poder adaptarlo a este ejercicio. Aqui se agrego un nuevo mensaje de cuyo payload es 'FIN' con el objetivo de avisarle al servidor que se finalizo el envio de datos por lo que el servidor puede enviarle el ACK del chunk completo. Este ACK tambien fue modificado y ahora envia la cantidad de paquetes que se procesaron en el chunk. Cabe aclara que a medida que los paquetes le llegan al servidor, el mismo los va procesando y no espera a tener todo el chunk completo para inciar el procesamiento para evitar tener cargados en memoria todos esos datos en caso de utilizar chunks muy grandes.  
 
 #### Ejecucion del ejercicio 6:
 Al igual que el ejercicio 5 se deben utilizar los comandos `make docker-compose-up` para levantar los containers (5 clientes y 1 servidor), `make docker-compose-logs` y `make docker-compose-down` para terminar de forma graceful con todos los containers.
 
 ### Resolucion ejercicio N°7:
 
-Para la resolucion de este ejercicio se modifica levemente el protocolo añadiendo un nuevo tipo de mensaje. Este tipo de mensaje es READY y es enviado por el cliente cuando finaliza el envio de todos los chunks. De esta forma, se tiene un mensaje de FIN para el caso donde se termina de enviar un chunk del archivo y un mensaje READY para cuando se termino de enviar el ultimo chunk. Es importante aclarar que al enviar el ultimo chunk, unicmanete se envia el mensaje READY, es decir, no se enviara el mensaje FIN. 
+Para la resolucion de este ejercicio se modifica levemente el protocolo añadiendo un nuevo tipo de mensaje. Este tipo de mensaje es READY y es enviado por el cliente cuando finaliza el envio de todos los chunks. De esta forma, se tiene un mensaje de FIN para el caso donde se termina de enviar un chunk del archivo y un mensaje READY para cuando se termino de enviar el ultimo chunk. Es importante aclarar que al enviar el ultimo chunk, unicmanete se envia el mensaje READY, es decir, no se enviara el mensaje FIN.
 
 Se barajo la posibilidad de utilizar un flag e incluirlo en el header, el cual adopte un valor al momento de que el cliente se encuentra en estado ready, sin embargo por motivos de tiempo y facilidad de implementacion respecto al protocolo existente se opto por un mensaje especial.
 
@@ -172,7 +180,7 @@ Se barajo la posibilidad de utilizar un flag e incluirlo en el header, el cual a
 Pasando al funcionamiento de parte del cliente, al finalizar el envio de todas las apuestas se queda a la espera de los ganadores. Estos llegaran como con el dato del DNI en el payload del mensaje, de esta forma el cliente lee el mensaje y agrega el DNI a la lista de ganadores. Cuando se detecte que el servidor cerro el canal de comunicaciones, se asume que no hay mas ganadores.
 
 
-Desde el punto de vista del servidor, se añade el soporte para el nuevo tipo de mensaje (READY). Cuando se detecta este mensaje, se guarda el socket en un diccionario llamado `_ready_clients` cuyas claves son los ID de los clientes y los valores sus respectivos sockes. Simplemente a modo de aclaracion, se penso en cerrar la conexion y que luego el servidor inicie una conexion con el cliente, sin embargo, no consideraba que sea correcto que el servidor inicie la conexion. 
+Desde el punto de vista del servidor, se añade el soporte para el nuevo tipo de mensaje (READY). Cuando se detecta este mensaje, se guarda el socket en un diccionario llamado `_ready_clients` cuyas claves son los ID de los clientes y los valores sus respectivos sockes. Simplemente a modo de aclaracion, se penso en cerrar la conexion y que luego el servidor inicie una conexion con el cliente, sin embargo, no consideraba que sea correcto que el servidor inicie la conexion.
 El servidor cuenta con una constante con la cantidad total de clientes, por lo tanto cuando se detecta que el tamaño del diccionario es igual a la cantidad de dicha constante, se utiliza la funcion `_send_winners` la cual utiliza filter junto a la funcion `load_bets` y `has_won` para iterar sobre los bets del archivo (evitando cargarlos todos en memoria simultaneamente) y luego se envia el documento a cada cliente segun el ID guardado en la bet empleando el diccionario anteriormente mecionado. Al enviar todos los ganadores, se cierran todos los sockets.
 
 
@@ -191,7 +199,7 @@ Cuando el servidor cree una cantidad de `TOTAL_AMOUNT_OF_CLIENTS` de instancias 
 De esta forma, cuando se configuran los ID en ProcessManager el proceso padre tiene la certeza de que puede realizar la loteria ya que no queda ninguna apuesta sin registrar. Otra posible solucion, seria en lugar de mandar el ID, que el proceso hijo le mande un bool cuando este listo para realizar la loteria aunque luego el proceso padre le deberia enviar a todos los hijos todos los ganadores y seria responsabilidad de ellos tomar unicamente los que necesitan. Por ultimo, se menciona que seria posible definir un protocolo mas complejo para el intercambio de informacion entre el padre y el hijo que logre el mismo resultado de manera mas clara sin embargo por motivos de tiempo se opto por la convencion anteriormente mencionada.  
 Continuando con la logica del padre, cuando todos los ProcessManager tienen sus ID cargados se procede a la obtencion de los ganadores y luego al envio de los ganadores a los respectivos hijos. Tras ello, se realiza un graceful finish de los procesos hijos y se eliminan de la lista de procesos permitiendo al servidor continuar con el loop de aceptacion de clientes.  
 Cabe aclarar que toda la comunicacion entre el proceso padre e hijo se realiza utilizando un `Pipe` bidireccional.  
-  
+ 
 #### Funcionamiento del proceso hijo del servidor:
 
 Como se menciono anteriormente, una vez creado el hijo el mismo permanece conectado al socket del cliente hasta el final de la comunicacion (donde le envia los ganadores). De esta forma, el proceso hijo quedara en un loop en el cual reciba las apuestas del cliente y en el momento en el que se finalize con la recepcion del total de las apuestas del cliente, se enviara al padre el ID del cliente que esta atendiendo.  

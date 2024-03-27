@@ -1,8 +1,6 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
 	"time"
 	"os"
@@ -64,71 +62,18 @@ func (c *Client) createClientSocket() error {
 
 func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	<-sigs
-	c.conn.Close()
-	log.Infof("action: Handling SIGTERM | result: success | client_id: %v",c.config.ID,)
-	finish_channel <- true
-}
-
-func (c *Client)sendMessage (payload_msg string) error{
-	msg := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
-	remainSize := len(msg)
-
-	for remainSize > 0 {
-		sendDataSize, err := c.conn.Write([]byte(msg))
-		if err != nil {
-			c.conn.Close()
-			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-                c.config.ID,
-				err,
-			)
-			return err
-		}
-		if sendDataSize == 0 {
-			break
-		}
-		remainSize -= sendDataSize
-	}
-	return nil
-}
-
-func (c *Client)receiveMessage () (string, error){
-	reader := bufio.NewReader(c.conn)
-	completeMsg := ""
-
-	for {
-		partialMsg, err := reader.ReadString('\n')
-		if (err != nil) && (err != io.EOF){
-			c.conn.Close()
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
-			return "", err
-		}
-		partialMsg = strings.TrimRight(partialMsg, "\r\n")
-		if partialMsg == "" {
-			break
-		}
-
-		completeMsg += partialMsg
-		if strings.Contains(completeMsg, ",") {
-			splitMsg := strings.SplitN(completeMsg, ",", 2)
-			expectedByteSize, err := strconv.Atoi(splitMsg[0])
-			if err != nil {
-				c.conn.Close()
-				log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
-				return "", err
-			}
-			receivedPayloadSize := len(splitMsg[1])
-			if receivedPayloadSize >= expectedByteSize {
-				break
-			}
-		}
-	}
-	//log.Infof("action: receive_message | result: success | msg: %v",completeMsg,)
-	return completeMsg, nil
+	select {
+    case finish_channel <- true:
+		c.conn.Close()
+		log.Infof("action: Handling SIGTERM | result: success | client_id: %v",c.config.ID,)
+    default:
+        return
+    }
 }
 
 func (c *Client)receiveWinners() error{
 	for {
-		winnerMsg, _ := c.receiveMessage()
+		winnerMsg, _ := receiveMessage(c.conn)
 		if winnerMsg == ""{
 			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d",len(c.winners),)
 			break
@@ -140,6 +85,8 @@ func (c *Client)receiveWinners() error{
 			return err
 		}
 		c.winners = append(c.winners, winnersDocument)
+		payload_msg := c.config.ID + ",ACK"
+		sendMessage(c.conn, payload_msg)
 	}
 	return nil
 }
@@ -147,7 +94,7 @@ func (c *Client)receiveWinners() error{
 func (c *Client)sendBetMessage () error{
 	betRegister := c.config.BetRegister
 	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
-	return c.sendMessage(payload_msg);
+	return sendMessage(c.conn, payload_msg);
 }
 
 // openFile opens the agency file in path: config.BetFilePath
@@ -176,13 +123,13 @@ func (c *Client) closeFile(file *os.File) error{
 // sendFinMessage sends a FIN messages to the server
 func (c *Client) sendFinMessage() error{
 	payload_msg := c.config.ID + FIN
-	return c.sendMessage(payload_msg);
+	return sendMessage(c.conn, payload_msg);
 }
 
 // sendReadyMessage sends a READY messages to the server
 func (c *Client) sendReadyMessage() error{
 	payload_msg := c.config.ID + READY
-	return c.sendMessage(payload_msg);
+	return sendMessage(c.conn, payload_msg);
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
@@ -225,7 +172,7 @@ loop:
 			if send_error !=nil{
 				break loop
 			}
-			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+			//log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 
 			if i == len(bets)-1 {
 				var send_error error
@@ -234,7 +181,7 @@ loop:
 					if send_error != nil{
 						break loop
 					}
-					_, err := c.receiveMessage()
+					_, err := receiveMessage(c.conn)
 					if err != nil {
 						break loop
 					}
@@ -245,7 +192,7 @@ loop:
 					if send_error != nil{
 						break loop
 					}
-					_, err := c.receiveMessage()
+					_, err := receiveMessage(c.conn)
 					if err != nil {
 						break loop
 					}
@@ -259,6 +206,5 @@ loop:
 	c.conn.Close()
 	c.closeFile(bet_file)
 	close(finish_channel)
-	close(sigs)
 	log.Infof("action: loop_finished_gracefuly | result: success | client_id: %v", c.config.ID)
 }
