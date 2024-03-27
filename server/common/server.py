@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 
+from common.communications import *
 from common.utils import *
 from common.communications import *
 from multiprocessing import Process, Pipe, Lock
