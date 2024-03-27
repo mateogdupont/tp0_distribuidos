@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 
+from common.communications import *
 from common.utils import *
 
 TOTAL_AMOUNT_OF_CLIENTS = 5
@@ -30,7 +31,8 @@ class Server:
         for bet in filtered_bets:
             winners_document = bet.document
             agency_socket = self._ready_clients[bet.agency]
-            self._send_message(agency_socket,winners_document)
+            send_message(agency_socket,winners_document)
+            receive_message(agency_socket)
         return
 
 
@@ -51,71 +53,20 @@ class Server:
                 self._send_winners()
                 for client_sock in self._ready_clients.values():
                     client_sock.close()
-
-
-    def _receive_header(self, client_sock):
-        """
-        Read the header of a message
-        """
-        complete_header = ""
-        while True:
-            partial_header = client_sock.recv(1).decode('utf-8')
-            if not partial_header:
-                logging.error("action: receive_header | result: fail")
-                break
-            complete_header += partial_header
-            if partial_header == ',':
-                break
-        return complete_header
-
-    def _receive_message(self, client_sock):
-        header = self._receive_header(client_sock)
-        if not header:
-            return ""
-        expected_payload_size = int(header[:-1])
-        complete_msg = header
-        while True:
-            partial_msg = client_sock.recv(expected_payload_size).decode('utf-8')
-            if not partial_msg:
-                logging.error("action: receive_message | result: fail | error: {e}")
-                break
-
-            complete_msg += partial_msg
-            if ',' in complete_msg:
-                split_msg = complete_msg.split(',', 1)
-                received_payload_size = len(split_msg[1].encode('utf-8'))
-                if received_payload_size >= expected_payload_size:
-                    break
-        
-        addr = client_sock.getpeername()
-        logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {complete_msg}')
-        return complete_msg
     
     def _receive_chunk(self, client_sock) -> int:
         received_amount = 0
         while True:
-            msg = self._receive_message(client_sock)      
+            msg = receive_message(client_sock)      
             chunk_finish = self._procces_message(msg,client_sock)
             if chunk_finish:
                 return received_amount
             received_amount += 1
-        
-    def _send_message(self, client_sock, payload):
-        payload_size = len(payload)
-        msg = "{},".format(payload_size) + payload + "\n"
-        remaind_size = len(msg)
-        while remaind_size > 0:
-            sent_data_size = client_sock.send(msg.encode('utf-8'))
-            if sent_data_size == 0:
-                logging.error("action: send_message | result: fail")
-                break
-            remaind_size -= sent_data_size
-            msg = msg[sent_data_size:]
 
     def _send_ack_message(self, client_sock, msg):
         amount_to_ack = msg.split(',', 1)[0]
         payload_msg = "ACK:" + amount_to_ack
-        self._send_message(client_sock, payload_msg)
+        send_message(client_sock, payload_msg)
  
     def _procces_message(self, msg, client_sock) -> bool:
         """
