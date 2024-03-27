@@ -8,6 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"strings"
+	"strconv"
+	"io"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -18,6 +21,7 @@ type ClientConfig struct {
 	ServerAddress string
 	LoopLapse     time.Duration
 	LoopPeriod    time.Duration
+	BetRegister   *BetRegister
 }
 
 // Client Entity that encapsulates how
@@ -58,6 +62,70 @@ func sigterm_handler(sigs chan os.Signal, finish_channel chan bool, c *Client){
 	finish_channel <- true
 }
 
+func (c *Client)sendMessage (msg string) error{
+	remainSize := len(msg)
+
+	for remainSize > 0 {
+		sendDataSize, err := c.conn.Write([]byte(msg))
+		if err != nil {
+			c.conn.Close()
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+                c.config.ID,
+				err,
+			)
+			return err
+		}
+		if sendDataSize == 0 {
+			break
+		}
+		remainSize -= sendDataSize
+	}
+	return nil
+}
+
+func (c *Client)receiveMessage () (string, error){
+	reader := bufio.NewReader(c.conn)
+	completeMsg := ""
+
+	for {
+		partialMsg, err := reader.ReadString('\n')
+		if (err != nil) && (err != io.EOF){
+			c.conn.Close()
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
+			return "", err
+		}
+		partialMsg = strings.TrimRight(partialMsg, "\r\n")
+
+		if partialMsg == "" {
+			break
+		}
+
+		completeMsg += partialMsg
+		if strings.Contains(completeMsg, ",") {
+			splitMsg := strings.SplitN(completeMsg, ",", 2)
+			expectedByteSize, err := strconv.Atoi(splitMsg[0])
+			if err != nil {
+				c.conn.Close()
+				log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",c.config.ID,err,)
+				return "", err
+			}
+			receivedPayloadSize := len(splitMsg[1])
+			if receivedPayloadSize >= expectedByteSize {
+				break
+			}
+		}
+	}
+	return completeMsg, nil
+}
+
+
+func (c *Client)sendBetMessage () error{
+	betRegister := c.config.BetRegister
+	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
+	msgWithHeader := fmt.Sprintf("%d,%s", len(payload_msg) ,payload_msg)
+	return c.sendMessage(msgWithHeader);
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	// autoincremental msgID to identify every message sent
@@ -84,31 +152,20 @@ loop:
 		default:
 		}
 
-		// Create the connection the server in every loop iteration. Send an
+		// Create the connection the server in every loop iteration.
 		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-                c.config.ID,
-				err,
-			)
+		send_error := c.sendBetMessage()
+		if send_error !=nil{
 			break loop
 		}
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-            c.config.ID,
-            msg,
-        )
+		_, err := c.receiveMessage()
+		if err != nil {
+			break loop
+		}
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
+		
+		msgID++
+		c.conn.Close()
 
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)

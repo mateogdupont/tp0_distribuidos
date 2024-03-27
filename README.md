@@ -65,8 +65,8 @@ client1 exited with code 0
 ## Parte 1: Introducción a Docker
 En esta primera parte del trabajo práctico se plantean una serie de ejercicios que sirven para introducir las herramientas básicas de Docker que se utilizarán a lo largo de la materia. El entendimiento de las mismas será crucial para el desarrollo de los próximos TPs.
 
-### Resolucion ejercicio N°1:
-Se modifica el archivo DockerCompose para agregar un nuevo cliente al proyecto.  
+### Ejercicio N°1:
+Modificar la definición del DockerCompose para agregar un nuevo cliente al proyecto.
 
 ### Resolucion ejercicio N°1.1:
 Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" el cual crea una cantidad N de clientes. El mismo debe ser ejecutado de la siguinete manera:
@@ -75,7 +75,7 @@ Se utilizo python para crear un archivo llamado "create_new_docker_compose.py" e
 ### Resolucion Ejercicio N°2:
 Se agrega al archivo docker-compose-dev los volumenes para el server y de los clientes, con el fin de vincular los archivos de la maquina host con los archivos del container. Siendo estos archivos `config.ini` para el server y `config.yaml` para el cliente. En la declaracion del volumen unicamente se comparten dichos archivos, es decir, no se comparte toda la carpeta. Asi mismo, se aclara que se opto por volumenes sin nombre o tambien llamados anonimos.
 
-Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de añadir los volumenes.  
+Paralelamente, se modifica el script creado en el ejercicio 1.1 con el fin de añadir los volumenes.
 
 Se verifica el correcto funcionamiento al realizar 'make docker-compose-up' con 'docker-image' comentado y corroborando los cambios realizados en la configuracion del servidor y de los clientes sin necesidad de realizar un nuevo build de las imagenes.
 
@@ -86,37 +86,60 @@ Ejecutar `./server_validation.sh`.
 El script `server_validation.sh` se encarga de levantar los containers del server y del cliente de prueba junto a la network que los conecta. Una vez iniciados ambos containers, se instala netcat en el cliente de prueba y tras ello se ejecuta en la bash del container el siguiente comando:  
 `if [ "$(echo "Test01" | nc server 12345)" = "Test01" ]; then echo "OK"; else echo "Error"; fi`
 
-Este comando muestra `OK` por la terminal en caso de exito o `Error` en caso de error. El funcionamiento del comando se basa en una estrucuta if, donde la condicion de verdad es la igualdad del resultado esperado (Test01) al ejecutar el comando nc server 12345 con 'Test01' como entrada. 
+Este comando muestra `OK` por la terminal en caso de exito o `Error` en caso de error. El funcionamiento del comando se basa en una estrucuta if, donde la condicion de verdad es la igualdad del resultado esperado (Test01) al ejecutar el comando nc server 12345 con 'Test01' como entrada.
 
 Continuando con `$(echo "Test01" | nc server 12345)`, aqui capturamos el resultado de la ejecucion de las instrucciones entre parentesis. Se envia por stdin "Test01" al comando "nc server 12345" para enviar el mensaje "Test01" a la IP "server" (configurada en el archivo config.ini del server) en el puerto 12345.
 
 Por ultimo, se detienen y eliminan los containers utilizados para la prueba.
 
-### Ejercicio N°4:
-Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
+### Resolucion ejercicio N°4:
+Se agregan los handlers respectivos para el servidor y para el cliente para lograr obtener un graceful finish en caso de recibir una señal SIGTERM.
+
+En caso del servidor, se utiliza la libreria signal. Dicha libreria nos permite definir un handler que sera llamado al momento de recibir la señal SIGTERM, este handler cambia el estado de una variable interna de server. En el bucle principal del servidor se verifica el estado de dicha variable para salir del bucle en caso que corresponda. Tras esto, se cierran los recursos abiertos por el programa y se finaliza la ejecucion.
+
+En el caso del cliente, se utilizan las librerias `os` y `syscall`. Previo al loop del cliente, se llama asincronicamente al handler de la señal, dicha señal proviene de un channel por lo que el handler al recibir dicho valor por el channel envia el valor true por un channel llamado "finish channel". Este segundo channel es escuchado por el loop principal mediante un select, lo que permite que al momento en el que se reciba el valor true por dicho canal se salga del loop cerrando correctamente los recursos del cliente.
 
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base al código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
 
-### Ejercicio N°5:
-Modificar la lógica de negocio tanto de los clientes como del servidor para nuestro nuevo caso de uso.
+### Resolucion ejercicio N°5:
 
 #### Cliente
-Emulará a una _agencia de quiniela_ que participa del proyecto. Existen 5 agencias. Deberán recibir como variables de entorno los campos que representan la apuesta de una persona: nombre, apellido, DNI, nacimiento, numero apostado (en adelante 'número'). Ej.: `NOMBRE=Santiago Lionel`, `APELLIDO=Lorca`, `DOCUMENTO=30904465`, `NACIMIENTO=1999-03-17` y `NUMERO=7574` respectivamente.
+El cliente recibe como variables de entorno todos los datos necesarios para realizar una apuesta. Dicha informacion se guarda dentro de la configuracion que se encuentra dentro del propio cliente.
 
-Los campos deben enviarse al servidor para dejar registro de la apuesta. Al recibir la confirmación del servidor se debe imprimir por log: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+Se agrega un el archivo `bet.go` donde se declara el tipo `BetRegister` junto a sus correspondientes funciones. Al momento de realizar una apuesta, el cliente utiliza la funcion `sendBetMessage` donde se crea una apuesta a partir de los datos cargados en la configuracion y luego se emplea dicha apuesta para crear un mensaje segun el protocolo descipto mas adelante y se envia hacia el servidor con la funcion `sendMessage`. Esta ultima funcion es la encargada de enviar los datos hacia el servidor evitando el fenomeno de short-write.
+
+Tras enviar la apuesta al servidor, el cliente utiliza la funcion `receiveMessage` para recibir el ACK por parte del servidor. En este caso, la funcion esta preparada para evitar el fenomeno de short-read.
 
 #### Servidor
-Emulará a la _central de Lotería Nacional_. Deberá recibir los campos de la cada apuesta desde los clientes y almacenar la información mediante la función `store_bet(...)` para control futuro de ganadores. La función `store_bet(...)` es provista por la cátedra y no podrá ser modificada por el alumno.
-Al persistir se debe imprimir por log: `action: apuesta_almacenada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+Se agrega la funcion `_receive_message` la cual devuelve el mensaje leido desde el socket evitando el fenomeno de short-read. Tras ello, se utiliza la funcion `procces_message` para crear una apuesta desde el mensaje obtenido y luego almacenarla.
 
-#### Comunicación:
-Se deberá implementar un módulo de comunicación entre el cliente y el servidor donde se maneje el envío y la recepción de los paquetes, el cual se espera que contemple:
-* Definición de un protocolo para el envío de los mensajes.
-* Serialización de los datos.
-* Correcta separación de responsabilidades entre modelo de dominio y capa de comunicación.
-* Correcto empleo de sockets, incluyendo manejo de errores y evitando los fenómenos conocidos como [_short read y short write_](https://cs61.seas.harvard.edu/site/2018/FileDescriptors/).
+Por ultimo, se envia al cliente un ACK mediante la funcion `_send_ack_message` la cual evita el problema de short.write.
+
+#### Protocolo de Comunicación:
+En lo que respecta al protocolo de comunicacion planteado para la resolucion del trabajo practico, consiste en una estructura de mensaje que se compone de un header y un payload.
+
+En primer lugar en el header, unicamente tendremos el tamaño del payload. Este header se encuentra al inicio del mensaje y al igual que el resto de componentes se encuentra separador del mensaje por una coma. El header del mensaje se considera el tamaño minimo a leer del mensaje y en caso de que la lectura del mensaje no contenga al menos al header completo se debera enviar nuevamente.
+
+Por otro lado, el payload contendra todos los campos correspondientes para el contenido del mensaje. En caso de ser un mensaje de apuesta, se compondra de los campos necesarios para realizar la apuesta con sus campos separados por una coma. Por otro lado, en caso de ser un mensaje de ACK se tendra la cadena "ACK" y el tamaño del paquete recibido anteriormente.
+
+
+Ejemplo de mensaje de apuesta: payload_size,agency_id,name,lastname,document,birthdate,number
+
+Ejemplo de mensaje ACK: payload_size,ACK:size_of_received_message
+
+
+Simplemente a modo de aclaracion, se menciona que como convencion se opto por que en caso de que se detecte un error al enviar o recibir un mensjae, no se reenviara el mensaje. Por ejemplo, en caso de que al momento de enviar la apuesta, la funcion `Write` del socket falle, no se reenviara la apuesta.  
+En lo que respecta a la eleccion del protocolo, es importante destacar que si bien es muy simple de parsear gracias a los separadores, no es el mas eficiente. Esto ya que se podria haber optado por un protocolo con campos de tamaño fijo y campos de tamaño variable cuyos tamaños se prodrian agregar en el header (el cual nuevamente seria de un tamaño fijo). De esta forma se evita el envio de separadores y se realiza una mejor administracion de los recursos de la red. El motivo por el cual no se opto por esta ultima opcion fue simplemente el tiempo requerido para realizarlo.  
+
+#### Aclaracion importante respecto al protocolo:
+Existe una diferencia entre la implementacion del protoclo para el cliente y para el servidor. Esta consiste en el modo de lectura de un mensaje entrante, el servidor lo realiza de forma "correcta" es decir lee la informacion del socket hasta encontrar el separador del header y luego lee el tamaño que contenia dicho header. Sin embargo, el cliente lee una linea completa el socket.  
+Esta diferencia se basa en que mi implementacion es compatible con este modo de lectura ya que no se envia mas de un mensaje a la vez por parte del servidor. Soy conciente de que no es algo "prolijo" pero se realizo en pos de ahorrar tiempo y continuar con el resto de ejercicios ya que por la forma en la que se comunican en mi TP no traeria problemas. Esta claro que en caso de querer formalizar el protocolo se realizaria una correcta implementacion como la que posee el servidor.  
+Tanto este ejercicio (5) como el ejercicicio 6 no cumplen con la abstraccion del protocolo, ya que las funciones de SendMessage y ReceiveMessage no se encuentran separadas de la logica del servidor ni del cliente. Este es un problema que solucione en el ejercicio 7 y 8, me disculpo por no incluirlo en este ejercicio aun sabiendo que es un error de mi parte sin embargo no llegue a modificarlo a tiempo para la entrega. 
+
+#### Ejecucion del ejercicio 5:
+Se debe ejecutar `make docker-compose-up` para levantar los containers (5 clientes y 1 servidor) y luego ejecutar `make docker-compose-logs`. Por ultimo, para finalizar la ejecucion se debe utilizar el comando `make docker-compose-down` para terminar de forma graceful con todos los containers.
 
 ### Ejercicio N°6:
 Modificar los clientes para que envíen varias apuestas a la vez (modalidad conocida como procesamiento por _chunks_ o _batchs_). La información de cada agencia será simulada por la ingesta de su archivo numerado correspondiente, provisto por la cátedra dentro de `.data/datasets.zip`.

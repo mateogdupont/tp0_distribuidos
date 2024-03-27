@@ -23,6 +23,12 @@ class Bet:
         self.document = document
         self.birthdate = datetime.date.fromisoformat(birthdate)
         self.number = int(number)
+    
+    @staticmethod
+    def from_message(bet_msg: str):
+        payload = bet_msg.split(',',1)[1]
+        agency, first_name, last_name, document, birthdate, number = payload.split(',')
+        return Bet(agency, first_name, last_name, document, birthdate, number)
 
 """ Checks whether a bet won the prize or not. """
 def has_won(bet: Bet) -> bool:
@@ -48,4 +54,3 @@ def load_bets() -> list[Bet]:
         reader = csv.reader(file, quoting=csv.QUOTE_MINIMAL)
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
-
