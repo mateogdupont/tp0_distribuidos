@@ -3,7 +3,7 @@ import logging
 
 def send_message(client_sock, payload):
     payload_size = len(payload)
-    msg = "{},".format(payload_size) + payload + "\n"
+    msg = "{},".format(payload_size) + payload
     remaind_size = len(msg)
     while remaind_size > 0:
         try:

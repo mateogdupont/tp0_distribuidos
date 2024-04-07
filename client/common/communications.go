@@ -1,11 +1,8 @@
 package common
 
 import (
-	"bufio"
 	"fmt"
 	"net"
-	"io"
-	"strings"
 	"strconv"
 )
 
@@ -27,34 +24,46 @@ func sendMessage (conn net.Conn, payload_msg string) error{
 	return nil
 }
 
+
+func receiveHeader(conn net.Conn) (string, error) {
+	completeHeader := ""
+	for {
+		byteBuffer := make([]byte, 1)
+		_, err := conn.Read(byteBuffer)
+		if err != nil {
+			return "", err
+		}
+		completeHeader += string(byteBuffer)
+		if string(byteBuffer) == "," {
+			break
+		}
+	}
+	return completeHeader, nil
+}
 func receiveMessage (conn net.Conn) (string, error){
-	reader := bufio.NewReader(conn)
-	completeMsg := ""
+	header, err := receiveHeader(conn)
+    if err != nil{
+		conn.Close()
+		return "", err
+	}
+	expectedPayloadSize, err := strconv.Atoi(header[:len(header)-1])
+	if err != nil{
+		conn.Close()
+		return "", err
+	}
+    payload := ""
 
 	for {
-		partialMsg, err := reader.ReadString('\n')
-		if (err != nil) && (err != io.EOF){
+		readBuffer := make([]byte, expectedPayloadSize - len(payload))
+		readSize, err := conn.Read(readBuffer)
+		if err != nil {
 			conn.Close()
 			return "", err
 		}
-		partialMsg = strings.TrimRight(partialMsg, "\r\n")
-		if partialMsg == "" {
+		payload += string(readBuffer[:readSize])
+		if len(payload) >= expectedPayloadSize || readSize == 0 {
 			break
 		}
-
-		completeMsg += partialMsg
-		if strings.Contains(completeMsg, ",") {
-			splitMsg := strings.SplitN(completeMsg, ",", 2)
-			expectedByteSize, err := strconv.Atoi(splitMsg[0])
-			if err != nil {
-				conn.Close()
-				return "", err
-			}
-			receivedPayloadSize := len(splitMsg[1])
-			if receivedPayloadSize >= expectedByteSize {
-				break
-			}
-		}
 	}
-	return completeMsg, nil
+	return header + payload, nil
 }
