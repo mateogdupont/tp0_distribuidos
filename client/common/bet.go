@@ -75,6 +75,22 @@ func (b *BetRegister)toBetMessage () string{
 	return fmt.Sprintf("%s,%s,%d,%s,%d", b.Name, b.Lastname, b.Document, b.Birthdate, b.Number)
 }
 
+// getChunkMessage creates the payload with the format of 
+// a chunk message:
+// client_id,bet_message,bet_message,...,fin_message
+func getChunkMessage(bets []*BetRegister, client_id string) string{
+	chunk_message := client_id
+	fin_payload := client_id + ",FIN"
+
+	for _, bet := range bets {
+		payload := fmt.Sprintf("%s,%s",client_id,bet.toBetMessage())
+		chunk_message += fmt.Sprintf(",%d,%s", len(payload),payload)
+	}
+
+	complete_msg := fmt.Sprintf("%s,%d,%s", chunk_message,len(fin_payload),fin_payload)
+	return complete_msg
+}
+
 func readChunkFromFile(reader *csv.Reader, chunksize int) ([]*BetRegister, error){
 	var bets []*BetRegister
     for i := 0; i < chunksize; i++ {

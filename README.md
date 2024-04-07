@@ -205,3 +205,25 @@ Cabe aclarar que toda la comunicacion entre el proceso padre e hijo se realiza u
 Como se menciono anteriormente, una vez creado el hijo el mismo permanece conectado al socket del cliente hasta el final de la comunicacion (donde le envia los ganadores). De esta forma, el proceso hijo quedara en un loop en el cual reciba las apuestas del cliente y en el momento en el que se finalize con la recepcion del total de las apuestas del cliente, se enviara al padre el ID del cliente que esta atendiendo.  
 Tras enviarle el ID del su cliente al padre el proceso queda a la espera de los ganadores que leera del propio Pipe que lo conecta con el proceso padre. Cuando se terminen de recibir todos los ganadores, se procede a enviarlos hacia el cliente y finalizar su ciclo de vida permitiendo que el proceso padre le pueda realizar un `join()`.  
 En lo que respecta al acceso del archivo de bets.csv, se utiliza un lock para garantizar que unicamente un proceso pueda acceder al mismo y de esta forma todos los proceso hijos pueden recibir apuestas que las almacenaran cuando obtengan el lock.
+
+
+
+### Reentraga:
+
+#### Modificacion de la lectura del socket por parte del cliente:
+Se modifico el metodo de lectura de mensajes del lado del cliente para ser consistente con la lectura de mensajes implementada en el servidor. Para ello se realiza una lectura de 1 byte hasta encontrar el caracter separador del header (`,`) y a partir de este punto se lee hasta obtener un payload de tamaño acorde al que contiene el header.
+
+#### Modificacion del envio de apuestas en chunks:
+Por otro lado, se modifica el metodo de envio de las apuestas en chunks por parte del cliente. Inicialmente cada apuesta se enviaba en un mensaje particular y luego se enviaba un mensaje de FIN cuando se finalizaba el envio del chunk. Para esta reentrega, se agruparon todos estos mensajes en un unico mensaje y de esta forma obtenemos un mensaje final compuesto por de la siguiente manera:
+
+Mnesaje_del_chunk = header,agencyId,betMessage,betMessage, ... ,finMessage  
+
+Con esta estructura, se continua con la logica del protocolo donde el header posee el tamaño del payload y en este caso el payload estaria compuesto por el agencyID y una concatenacion de los mensajes correspondientes a cada una de las apuestas y a un mensaje de FIN. Cabe aclarar que cada uno de estos mensajes concatenados cumple con la estructura de los mensajes del protocolo, es decir, poseen su header y payload.  
+Adicionalmente, considero importante aclarar que al igual que el resto de mensajes del protocolo, el cliente debe recibir un ACK por parte del servidor tras enviar este mensaje.  
+
+#### Modificacion de la recepcion de apuestas en chunks:
+En lo que respecta al servidor, se modifico la lectura del mensaje de apuestas. El proceso es muy similar al anterior ya que ahora al recibir un mensaje de apuestas, el mismo se itera por cada uno de los mensajes que se incluyen y los procesa de forma independiente. Este proceso finaliza cuando se procesa el mensaje de FIN que se tiene al final del mensaje de apuestas.
+
+#### Correcciones generales:
+
+Por ultimo, se realizan mejoras en la calidad general del codigo y se añadieron comentarios en secciones importantes del codigo.
