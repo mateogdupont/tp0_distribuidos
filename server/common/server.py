@@ -85,23 +85,20 @@ class Server:
         Function blocks until a connection to a client is made.
         Then connection created is printed and returned
         """
-
-        # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
 
-def send_ack_message(client_sock, msg):
-    amount_to_ack = msg.split(',', 1)[0]
-    payload_msg = "ACK:" + amount_to_ack
+def send_ack_message(client_sock, amount_receiced):
+    payload_msg = "ACK:{}".format(amount_receiced)
     send_message(client_sock, payload_msg)
 
-def procces_message(msg, file_lock):
+def procces_bet_message(msg, file_lock):
     """
-    Procces message
+    Procces bet message
 
-    If massage type is bet, the server stores the bet.
+    The server procces the bet message and stores the bet.
     """
     bet = Bet.from_message(msg)
     with file_lock:
@@ -110,28 +107,32 @@ def procces_message(msg, file_lock):
 
 def receive_chunk(client_sock,file_lock) -> tuple[int, str]:
     """
-    Read a complete chunk. It reads until a FIN or a READY message.
+    Read a complete chunk.
 
     It returns the amount of messages read in the chunk and the last
     message of the chunk.
+    If the message is not from a chunk of bets (for example a READY message)
+    the server returns the message.
+    If the message is a chunk of bets, it splits the message and proccess
+    each message.
     """
-    received_amount = 0
+    amounts_of_bets = 0
     msg = receive_message(client_sock)
     
+    #If empty or just end msg it returns the message
     if not msg.strip() or is_end_msg(msg):
-        return (received_amount , msg)
+        return (amounts_of_bets , msg)
     
-    split_payload = msg.split(',')[2:]
-    while True:
-        if len(split_payload) < AMOUNT_OF_BET_MSG_COMPONENTS:
-            last_msg = ','.join(split_payload)
-            if not last_msg.strip() or is_end_msg(last_msg):
-                return (received_amount , last_msg)
+    splited_payload = msg.split(',')[2:]
+    while True:       
+        if len(splited_payload) < AMOUNT_OF_BET_MSG_COMPONENTS:
+            last_msg = ','.join(splited_payload)
+            return (amounts_of_bets , last_msg)
         
-        bet_msg = ','.join(split_payload[:AMOUNT_OF_BET_MSG_COMPONENTS])
-        procces_message(bet_msg,file_lock)
-        split_payload = split_payload[AMOUNT_OF_BET_MSG_COMPONENTS:]
-        received_amount += 1
+        bet_msg = ','.join(splited_payload[:AMOUNT_OF_BET_MSG_COMPONENTS])
+        procces_bet_message(bet_msg,file_lock)
+        splited_payload = splited_payload[AMOUNT_OF_BET_MSG_COMPONENTS:]
+        amounts_of_bets += 1
 
 def receive_and_send_winners(client_sock, pipe_with_manager):
     winners = []
@@ -158,8 +159,8 @@ def handle_client_connection(client_sock,file_lock, pipe_with_manager):
             client_sock.close()
             pipe_with_manager.close()
             break
-        msg = "{},\n,".format(amount_receiced)
-        send_ack_message(client_sock,msg)
+        send_ack_message(client_sock,amount_receiced)
+
         if is_ready_msg(last_message):
             #Notify main process and wait for winners
             client_id = get_client_id(last_message)

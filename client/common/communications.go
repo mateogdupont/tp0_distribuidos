@@ -6,6 +6,9 @@ import (
 	"strconv"
 )
 
+// sendMessage takes the payload of a message sends it
+// through a socket with its header. This function 
+// prevents short-write errors.
 func sendMessage (conn net.Conn, payload_msg string) error{
 	msg := fmt.Sprintf("%d,%s", len(payload_msg),payload_msg)
 	remainSize := len(msg)
@@ -24,7 +27,9 @@ func sendMessage (conn net.Conn, payload_msg string) error{
 	return nil
 }
 
-
+// receiveHeader reads from a socket and returns 
+// the header of a message. It reads by one byte until it 
+// finds the delimiter
 func receiveHeader(conn net.Conn) (string, error) {
 	completeHeader := ""
 	for {
@@ -40,6 +45,9 @@ func receiveHeader(conn net.Conn) (string, error) {
 	}
 	return completeHeader, nil
 }
+
+// receiveMessage reads from a socket and returns 
+// the message, it also prevents short-read errors.
 func receiveMessage (conn net.Conn) (string, error){
 	header, err := receiveHeader(conn)
     if err != nil{

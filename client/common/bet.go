@@ -75,7 +75,8 @@ func (b *BetRegister)toBetMessage () string{
 	return fmt.Sprintf("%s,%s,%d,%s,%d", b.Name, b.Lastname, b.Document, b.Birthdate, b.Number)
 }
 
-// getChunkMessage creates the payload for a chunk message with:
+// getChunkMessage creates the payload with the format of 
+// a chunk message:
 // client_id,bet_message,bet_message,...,fin_message
 func getChunkMessage(bets []*BetRegister, client_id string) string{
 	chunk_message := client_id

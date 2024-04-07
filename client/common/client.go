@@ -91,12 +91,40 @@ func (c *Client)receiveWinners() error{
 	return nil
 }
 
+// requestAndShowWinners sends an ready message and
+// waits for the winners information
+func (c *Client)requestAndShowWinners() error{
+	send_error := c.sendReadyMessage()
+	if send_error != nil{
+		return send_error
+	}
+	_, err := receiveMessage(c.conn)
+	if err != nil {
+		return err
+	}
+	return c.receiveWinners()
+}
+
 func (c *Client)sendBetMessage () error{
 	betRegister := c.config.BetRegister
 	payload_msg := c.config.ID + "," + betRegister.toBetMessage()
 	return sendMessage(c.conn, payload_msg);
 }
 
+// sendChunkAndReceiveAck sends an entire chunk message and
+// waits for its ACK
+func (c *Client)sendChunkAndReceiveAck (bets []*BetRegister) error{
+	payload_msg := getChunkMessage(bets, c.config.ID)
+	send_error := sendMessage(c.conn, payload_msg)
+	if send_error != nil{
+		return send_error
+	}
+	_, err := receiveMessage(c.conn)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 // openFile opens the agency file in path: config.BetFilePath
 // returns error in case that it couldnt open the file
 func (c *Client) openFile() (*os.File, error) {
@@ -132,58 +160,39 @@ func (c *Client) sendReadyMessage() error{
 	return sendMessage(c.conn, payload_msg);
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
+// StartClientLoop Send bets from the agency file and get the winners
 func (c *Client) StartClientLoop() {
 	sigs := make (chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM);
 	finish_channel := make(chan bool, 1)
 	go sigterm_handler(sigs,finish_channel, c)
-
+	amount, _ := strconv.Atoi(c.config.BetAmount)
 	bet_file,_ := c.openFile()
 	bet_reader := csv.NewReader(bet_file)
-	// Create the connection the server.
 	c.createClientSocket()
 loop:
-	// Send messages if the loopLapse threshold has not been surpassed
 	for timeout := time.After(c.config.LoopLapse); ; {
 		select {
 		case <-timeout:
-	        log.Infof("action: timeout_detected | result: success | client_id: %v",
-                c.config.ID,
-            )
+	        log.Infof("action: timeout_detected | result: success | client_id: %v",c.config.ID,)
 			break loop
 		case <- finish_channel:
 			log.Infof("action: Exiting loop | result: success | client_id: %v",c.config.ID,)
 			break loop
-
 		default:
 		}
 
-		amount, _ := strconv.Atoi(c.config.BetAmount)
 		bets, read_chunk_err := readChunkFromFile(bet_reader, amount)
 
 		if read_chunk_err != nil && len(bets) == 0{
 			if read_chunk_err == io.EOF{
-				send_error := c.sendReadyMessage()
-				if send_error != nil{
-					break loop
-				}
-				_, err := receiveMessage(c.conn)
-				if err != nil {
-					break loop
-				}
-				c.receiveWinners()
+				c.requestAndShowWinners()
 			}
 			break loop
 		}
 
-		payload_msg := getChunkMessage(bets, c.config.ID)
-		send_error := sendMessage(c.conn, payload_msg)
+		send_error := c.sendChunkAndReceiveAck(bets)
 		if send_error != nil{
-			break loop
-		}
-		_, err := receiveMessage(c.conn)
-		if err != nil {
 			break loop
 		}
 		time.Sleep(c.config.LoopPeriod)
