@@ -162,45 +162,30 @@ loop:
 		amount, _ := strconv.Atoi(c.config.BetAmount)
 		bets, read_chunk_err := readChunkFromFile(bet_reader, amount)
 
-		if read_chunk_err != nil && read_chunk_err != io.EOF{
-			c.sendFinMessage()
+		if read_chunk_err != nil && len(bets) == 0{
+			if read_chunk_err == io.EOF{
+				send_error := c.sendReadyMessage()
+				if send_error != nil{
+					break loop
+				}
+				_, err := receiveMessage(c.conn)
+				if err != nil {
+					break loop
+				}
+				c.receiveWinners()
+			}
 			break loop
 		}
-		for i, bet := range bets {
-			c.config.BetRegister = bet
-			send_error := c.sendBetMessage()
-			if send_error !=nil{
-				break loop
-			}
-			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",c.config.BetRegister.Document,c.config.BetRegister.Number,)
 
-			if i == len(bets)-1 {
-				var send_error error
-				if read_chunk_err == io.EOF{
-					send_error = c.sendReadyMessage()
-					if send_error != nil{
-						break loop
-					}
-					_, err := receiveMessage(c.conn)
-					if err != nil {
-						break loop
-					}
-					c.receiveWinners()
-					break loop
-				}else{
-					send_error = c.sendFinMessage()
-					if send_error != nil{
-						break loop
-					}
-					_, err := receiveMessage(c.conn)
-					if err != nil {
-						break loop
-					}
-				}
-			}
+		payload_msg := getChunkMessage(bets, c.config.ID)
+		send_error := sendMessage(c.conn, payload_msg)
+		if send_error != nil{
+			break loop
 		}
-
-		// Wait a time between sending one message and the next one
+		_, err := receiveMessage(c.conn)
+		if err != nil {
+			break loop
+		}
 		time.Sleep(c.config.LoopPeriod)
 	}
 	c.conn.Close()

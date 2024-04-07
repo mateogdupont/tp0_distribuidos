@@ -7,6 +7,7 @@ from common.communications import *
 from multiprocessing import Process, Pipe, Lock
 
 TOTAL_AMOUNT_OF_CLIENTS = 5
+AMOUNT_OF_BET_MSG_COMPONENTS = 7
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -115,12 +116,21 @@ def receive_chunk(client_sock,file_lock) -> tuple[int, str]:
     message of the chunk.
     """
     received_amount = 0
+    msg = receive_message(client_sock)
+    
+    if not msg.strip() or is_end_msg(msg):
+        return (received_amount , msg)
+    
+    split_payload = msg.split(',')[2:]
     while True:
-        msg = receive_message(client_sock)
-        if not msg.strip() or is_end_msg(msg):
-            return (received_amount , msg)
-
-        procces_message(msg,file_lock)
+        if len(split_payload) < AMOUNT_OF_BET_MSG_COMPONENTS:
+            last_msg = ','.join(split_payload)
+            if not last_msg.strip() or is_end_msg(last_msg):
+                return (received_amount , last_msg)
+        
+        bet_msg = ','.join(split_payload[:AMOUNT_OF_BET_MSG_COMPONENTS])
+        procces_message(bet_msg,file_lock)
+        split_payload = split_payload[AMOUNT_OF_BET_MSG_COMPONENTS:]
         received_amount += 1
 
 def receive_and_send_winners(client_sock, pipe_with_manager):
